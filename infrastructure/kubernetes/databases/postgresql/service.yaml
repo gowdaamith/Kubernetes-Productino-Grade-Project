@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-postgres
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: inventory-postgres
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  type: ClusterIP
+  selector: 
+    app.kubernetes.io/name: inventory-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP

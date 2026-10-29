@@ -1,0 +1,111 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: ecommerce-ui
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: ecommerce-ui
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ecommerce-ui
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow requests from other Pods in the ecommerce namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ecommerce
+      ports:
+        - protocol: TCP
+          port: 4000
+
+    # Allow requests from an ingress-nginx controller.
+    # Verify these namespace and Pod labels before enabling this policy.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/component: controller
+      ports:
+        - protocol: TCP
+          port: 4000
+
+  egress:
+    # Allow DNS lookups through CoreDNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Profile Management
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: profile-management
+      ports:
+        - protocol: TCP
+          port: 3003
+
+    # Product Catalog
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: product-catalog
+      ports:
+        - protocol: TCP
+          port: 3001
+
+    # Product Inventory
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: product-inventory
+      ports:
+        - protocol: TCP
+          port: 3002
+
+    # Order Management
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: order-management
+      ports:
+        - protocol: TCP
+          port: 9090
+
+    # Shipping and Handling
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: shipping-and-handling
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Contact Support
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: contact-support-team
+      ports:
+        - protocol: TCP
+          port: 8000

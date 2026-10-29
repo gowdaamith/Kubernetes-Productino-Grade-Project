@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: shipping-and-handling-config
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: shipping-and-handling
+    app.kubernetes.io/part-of: ecommerce
+
+data:
+  PORT: "8080"
+  MONGO_URI: "mongodb://mongodb:27017"
+

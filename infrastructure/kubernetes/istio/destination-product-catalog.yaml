@@ -1,0 +1,19 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: product-catalog
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  hosts: product-catalog.ecommerce.svc.cluster.local
+  trafficPolicy: 
+    tls:
+      mode: ISTIO_MUTUAL
+    loadBalancer:
+      simple: ROUND_ROBIN
+  subnets:
+    - name: v1
+       labels: 
+         version: v1
+

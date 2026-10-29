@@ -1,0 +1,192 @@
+Profile Management Microservice?
+Our Profile Management microservice is responsible for managing customer accounts, authenticating users, and allowing customers to view and update their profile information.
+
+For example, when a customer creates an account on our e-commerce website, they provide information such as:
+- First name
+- Last name
+- Address
+- Postal code
+- Email address
+- Password
+The Profile Management microservice stores this information in a MySQL database and provides APIs for registration, login, authentication, and profile updates.
+
+Later, when the customer logs in, the service verifies their credentials and generates a JWT authentication token.
+
+The customer can use this token to access protected endpoints, such as viewing or updating their profile.
+
+
+| Component  	        | 		Purpose |
+
+| Node.js	        | Executes the JavaScript application |
+| Express.js  	        | Creates REST API endpoints |
+| MySQL 	        | Stores customer account and profile information |
+| `mysql2` 	        | Allows Node.js to communicate with MySQL |
+| `jsonwebtoken`        | Generates and verifies JWT authentication tokens |
+| `body-parser`         | Parses JSON request bodies |
+| `cors` 	        | Configures cross-origin HTTP access |
+| `auth_api.js`         | Main application file |
+| `package.json`        | Defines application dependencies |
+| Docker                | Packages  the application into a container |
+| Kubernetes Secret     | Supplies sensitive database credentials to the Pod |
+| Kubernetes Deployment | Manages application replicas |
+| Kubernetes Service    | Provides a stable network endpoint for the application |
+| Port 3003    		| Default HTTP port of the Profile Management API |
+
+
+|HTTPMethod | Endpoint    | Purpose |
+
+| POST | `/api/signup`    | Registers a new customer |
+| POST | `/api/signin`    | Authenticates a customer and generates a JWT |
+| POST | `/api/signout`   | Returns a logout response for an authenticated user |
+| GET  | `/api/protected` | Retrieves the authenticated user's profile |
+| PUT  | `/api/update`    | Updates the authenticated user's profile |
+| GET  | `/health/live`   | Checks whether the application is responding |
+| GET  | `/health/ready`  | Checks whether the application can communicate with MySQL |
+
+
+Complete application Startup Flow:
+
+                 START APPLICATION
+                         |
+                         v
+                Run auth_api.js
+                         |
+                         v
+              Read Environment Variables
+                         |
+                         v
+                Configure Express
+                         |
+                         v
+                Connect to MySQL
+                         |
+                         v
+             Verify Database Connection
+                         |
+                         v
+                Start HTTP Server
+                         |
+                         v
+                  Listen on Port
+                       3003
+                         |
+                         v
+                 Health Endpoints
+                         |
+                         v
+                READY TO SERVE USERS
+
+
+Environment Variables Requrired:
+
+Environment VAriables         Example value             
+MYSQL_HOST                    profile-mysql
+MYSQL_PORT                      3306
+MYSQL_DATABASE                profile_user
+MYSQL_PASSWORD                profile_user
+PORT                            3003
+
+
+Docker Containerization: 
+
+Once the application code is correcte we will start setting up the dockerfile:
+
+The Docker image will contain: 
+* A node.js runtime
+* The auth_api.js application
+* package.json
+* Installed npm dependnecies
+
+Testing the Docker before the kubernetes:
+Create a Docker network:
+>> docker network create ecommerce-net
+
+Create a persistent volume:
+>> docker network create ecommerce-net
+
+Start the mysql:
+
+docker run -d \
+  --name profile-mysql \
+  --network ecommerce-net \
+  -v profile-mysql-data:/var/lib/mysql \
+  -e MYSQL_DATABASE=profile_db \
+  -e MYSQL_USER=profile_user \
+  -e MYSQL_PASSWORD='<your-test-password>' \
+  -e MYSQL_ROOT_PASSWORD='<your-test-root-password>' \
+  mysql:8.4
+
+check the docker mysql logs and  run the Profile managment docker image:
+
+docker run -d \
+  --name profile-management \
+  --network ecommerce-net \
+  -p 3003:3003 \
+  -e PORT=3003 \
+  -e MYSQL_HOST=profile-mysql \
+  -e MYSQL_PORT=3306 \
+  -e MYSQL_DATABASE=profile_db \
+  -e MYSQL_USER=profile_user \
+  -e MYSQL_PASSWORD='<your-test-password>' \
+  profile-management:v1
+
+
+Testing: 
+
+>> docker ps 
+
+output: You should see the MySQL and Profile Management containers running.
+
+>> docker logs profile-managment
+
+Test liveness:
+>> curl http://localhost:3003/health/live
+
+OUtput:
+ {
+  "status": "alive"
+}
+
+Test Readiness: 
+>> curl http://localhost:3003/health/ready
+
+Output: 
+{
+  "status": "ready"
+}
+
+Test registration: 
+
+>> curl -X POST http://localhost:3003/api/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Amith",
+    "lastName": "Gowda",
+    "address": "Bengaluru",
+    "postalCode": "560001",
+    "email": "amith-test@example.com",
+    "password": "local-test-password"
+  }'
+
+                    ecommerce Namespace
+                            |
+             --------------------------------
+             |                              |
+             v                              v
+       MySQL StatefulSet            Profile Management
+             |                        Deployment
+             v                              |
+       MySQL Service                -----------------
+             |                      |               |
+             v                      v               v
+         MySQL Pod                 Pod 1           Pod 2
+                                        \           /
+                                         \         /
+                                          v       v
+                                   Profile Management
+                                          Service
+                                               |
+                                               v
+                                      Other Services /
+                                          Frontend
+

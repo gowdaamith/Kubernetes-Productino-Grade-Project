@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: product-catalog
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: product-catalog
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: product-catalog
+
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: contact-support-team
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: contact-support-team
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: contact-support-team
+
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

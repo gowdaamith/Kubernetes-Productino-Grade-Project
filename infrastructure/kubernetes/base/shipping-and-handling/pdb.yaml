@@ -1,0 +1,16 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+
+metadata:
+  name: shipping-and-handling
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: shipping-and-handling
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  minAvailable: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-and-handling

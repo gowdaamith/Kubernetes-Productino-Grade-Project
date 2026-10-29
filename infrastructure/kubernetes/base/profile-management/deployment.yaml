@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: profile-management
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: profile-management
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: profile-management
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: profile-management
+        app.kubernetes.io/part-of: ecommerce-platform
+
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+
+      # Pod-level security settings.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: profile-management
+
+          image: profile-management:v1
+          imagePullPolicy: IfNotPresent
+
+          # Container-level security settings.
+          securityContext:
+            allowPrivilegeEscalation: false
+
+            capabilities:
+              drop:
+                - ALL
+
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+
+            seccompProfile:
+              type: RuntimeDefault
+
+          ports:
+            - name: http
+              containerPort: 3003
+              protocol: TCP
+
+          # Non-sensitive application configuration.
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: profile-management-config
+                  key: PORT
+
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: profile-management-config
+                  key: MYSQL_HOST
+
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: profile-management-config
+                  key: MYSQL_PORT
+
+            # Database credentials from the Kubernetes Secret.
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: profile-mysql-secret
+                  key: MYSQL_DATABASE
+
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: profile-mysql-secret
+                  key: MYSQL_USER
+
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: profile-mysql-secret
+                  key: MYSQL_PASSWORD
+
+          # CPU and memory requirements.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # Allow time for the application to start.
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 30
+
+          # Send traffic only to ready Pods.
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Restart the container if the application becomes unhealthy.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3

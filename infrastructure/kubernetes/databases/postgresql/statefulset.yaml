@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: inventory-postgres
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: inventory-postgres
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  serviceName: inventory-postgres
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: inventory-postgres
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: inventory-postgres
+        app.kubernetes.io/part-of: ecommerce-platform
+
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch  
+        seccompProfile:
+          type: RuntimeDefault
+# fsGroup: 999 — specifies the group ID for accessing supported mounted volumes.
+# fsGroupChangePolicy: OnRootMismatch — if the volume's root directory already has the expected ownership and permissions, Kubernetes skips recursively changing them. Otherwise, it applies the necessary changes.
+# another option for this is : always
+
+      containers:
+        - name: postgres
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-postgres-secret
+                  key: POSTGRES_DB
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-postgres-secret
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: inventory-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            failureThreshold: 30
+            periodSeconds: 5
+
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            periodSeconds: 20
+            timeoutSeconds: 5
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: inventory-postgres-pvc

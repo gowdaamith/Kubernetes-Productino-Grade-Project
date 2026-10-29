@@ -1,0 +1,20 @@
+/* Minimal professional theme for product detail */
+.product-detail-container{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px;
+  display:flex;
+  gap:20px;
+  align-items:flex-start;
+}
+.product-image{flex:1;margin-right:16px}
+.product-image img{width:100%;border-radius:12px}
+.product-info{flex:2;background:var(--panel);padding:18px;border-radius:var(--radius);box-shadow:var(--shadow)}
+.product-info h2{font-size:22px;margin:0 0 8px;color:var(--text)}
+.product-description{color:var(--muted);margin:0 0 12px}
+.product-price{font-size:20px;font-weight:700;margin:0 0 12px}
+.product-category{font-size:13px;color:var(--muted);margin-bottom:16px}
+.back-button{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;background:transparent;border-radius:8px;border:1px solid rgba(15,23,32,0.06);color:var(--text)}
+.purchase-button{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;font-size:14px;background:var(--accent);color:#fff;border-radius:12px;border:none;cursor:pointer}
+.purchase-button:hover{opacity:0.95}
+.product-quantity{font-size:14px;margin:0 0 12px}

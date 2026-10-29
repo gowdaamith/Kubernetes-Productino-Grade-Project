@@ -1,0 +1,329 @@
+Ecommerce UI
+
+Our Ecommerce UI is responsible for providing the user interface of our e-commerce application.
+
+It allows customers to interact with the website and perform operations such as:
+
+- View available products.
+- View product details and prices.
+- Check product availability.
+- Register and log in.
+- Add products to their cart.
+- Place orders.
+- View order information.
+- Contact customer support.
+
+The ecommerce UI displays this information but does not store the product informatino itself
+
+Instead, it communicates with the backend microservices to retrieve the required information.
+
+Important: Our ecommerce UI contains two main parts
+
+1.React frontend: Displays the website and allows customers to interact with  it
+
+2.Node.js / Express gateway: Receives the  api request from the frontend and forwards them to the appropriate backend microservice
+
+Technologies used:
+Component                                Purpose
+
+React.js           Builds the user interface of the e-commerce website.
+
+JavaScript         Implements frontend and gateway functionality.
+
+React Router       Handles navigation between frontend pages.
+
+Material UI        Provides reusable UI components such as buttons, forms, and cards.
+
+Node.js            Executes the JavaScript gateway application.
+
+Express.js         Creates API routes and serves the React application.
+
+Fetch API          Allows the gateway to send HTTP requests to backend microservices.
+
+server.js          Main entry point of the Express gateway.
+
+server/routes/     Contains API routes for communicating with backend services.
+
+client/            Contains the React frontend application.
+
+package.json       Defines application dependencies and scripts.
+
+package-lock.json  Records the installed dependency versions.
+
+Docker             Packages the React build and Express gateway into a container image.
+
+Kubernetes         Deploys, manages, and scales the Ecommerce UI.
+
+ConfigMap          Provides backend microservice URLs and application configuration.
+
+Port 4000          Port on which the Express gateway listens.
+
+Kubernetes Service Exposes the Ecommerce UI internally on port 80.
+
+Ingress            Routes incoming HTTP requests to the Ecommerce UI Service.
+
+
+
+Flow chart of the ecommerce UI: 
+
+                 CUSTOMER
+                     |
+                     v
+                WEB BROWSER
+                     |
+                     v
+              REACT FRONTEND
+                     |
+                     | HTTP Requests
+                     v
+             NODE.JS / EXPRESS
+                API GATEWAY
+                  Port 4000
+                     |
+       +-------------+-------------+
+       |             |             |
+       v             v             v
+ Product Catalog  Inventory   Order Management
+    Port 3001     Port 3002      Port 9090
+       |             |             |
+       v             v             v
+    MongoDB      PostgreSQL    Order Processing
+
+
+          ORDER       MICROSERVICES
+                   |
+       +-----------+-----------+
+       |           |           |
+       v           v           v
+    Profile     Shipping     Contact
+   Management   Handling     Support
+   Port 3003    Port 8080    Port 8000
+       |
+       v
+     MySQL
+
+
+The express gateway acts as a intermediary between the frontend and the backend services
+
+This means the browsers does n't need to know the internal kubernetes addresses of every microservice
+
+
+
+Understanding the API endpoints:
+--------------------------------
+
+The ecommerce UI gateway exposes a health endpoint and API routes
+
+
+Endpoint          Method               Purpose
+   /               GET                  Serves the React frontend
+/health/live       GET                  Checks whether the gatewayis running/api/...        Dependsd on the route   Forwards API requests to backend mic                                        roservices
+The gateway contains route modules for: 
+
+Route Module                 Backend microservice
+
+Product Routes               Product catalog
+Inventory Routes             Product inventory
+Order Routes                 Order management
+Profile Route                Profile management
+shipping Route               shipping and handling
+Contact route                Contact support team
+
+The exact api path depends on the route defination inside the server/routes/.
+
+
+5. Step-by-Step Explanation
+
+Step 1: Customer opens the e-commerce website
+-----------------------------------------------
+The customer opens the website using a browser.
+
+For local Kubernetes testing, we used:
+>> http://localhost:8080
+This address works while the Kubernetes port-forward command is running.
+
+The browser sends an HTTP request to the application.
+
+Step 2: Kubernetes forwards the request
+----------------------------------------------
+Our Ecommerce UI is deployed inside the ecommerce namespace.
+
+The Kubernetes Service is named:
+
+ecommerce-ui
+The Service listens on port 80 and forwards traffic to the Ecommerce UI Pods on port 4000.
+
+          Browser
+             |
+             v
+      localhost:8080
+             |
+             v
+      Kubernetes Service
+       ecommerce-ui:80
+             |
+             v
+       Ecommerce UI Pod
+          Port 4000
+
+Step 3: Express receives the request
+-------------------------------------------------
+The Node.js application runs the Express gateway.
+
+The main application file is:
+server/server.js
+
+Express receives the HTTP request.
+When the customer requests the homepage, Express serves the compiled React application.
+
+Step 4: React displays the website
+------------------------------------------------
+The browser downloads the React application's HTML, JavaScript, and CSS files.
+
+React renders the user interface.
+
+For example, the customer can see the navigation bar, product listing area, login page, and other frontend components.
+
+Step 5: React requests product information
+-------------------------------------------------
+When the customer opens the products page, React needs product information.
+The frontend sends an HTTP request to the Express gateway.
+The gateway identifies the matching product route.
+
+Step 6: Gateway communicates with Product Catalog
+-------------------------------------------------
+The gateway reads the Product Catalog URL from its environment configuration.
+
+In Kubernetes, we configured:
+
+>> PRODUCT_API_URL=http://product-catalog:3001
+The gateway uses the Fetch API to communicate with Product Catalog.
+
+The request travels through the internal Kubernetes network.
+
+       React Frontend
+              |
+              v
+        Express Gateway
+              |
+              | HTTP Request
+              v
+       Product Catalog
+          Port 3001
+              |
+              v
+           MongoDB
+              |
+              v
+       Product Information
+
+Step 7: Product Catalog retrieves the data
+----------------------------------------------------
+Product Catalog queries MongoDB.
+MongoDB returns the product information to Product Catalog.
+Product Catalog then sends the response back to the Ecommerce UI gateway.
+
+Step 8: Gateway returns the response
+----------------------------------------------------
+The Express gateway receives the backend response and forwards the relevant information to the frontend.
+
+The response may contain product details such as:
+
+{
+  "id": 1,
+  "name": "Laptop",
+  "price": 50000,
+  "category": "Electronics"
+}
+
+This is an illustrative product response; the actual fields depend on the Product Catalog API.
+
+Step 9: React displays the products
+----------------------------------------------------
+React receives the API response.
+It uses the product information to display product cards, names, prices, and other details.
+
+The customer can now browse the products.
+
+
+Environmental Variables Required: 
+---------------------------------
+Environment              Value 
+  Variable 
+
+
+NODE_ENV               production 
+
+PORT                     4000
+
+PROFILE_API_URL   http://profile-management:3003
+
+PRODUCT_API_URL   http://product-catalog:3001
+
+INVENTORY_API_URL http://product-inventory:3002
+
+ORDER_API_URL     http://order-management:9090
+
+SHIPPING_API_URL  http://shipping-and-handling:8080
+
+CONTACT_API_URL   http://contact-support-team:8000
+
+
+Docker testing : 
+
+Build the Docker Image:
+-----------------------
+
+>> docker build -t ecommerce-ui:v1 .
+
+Run the Docker image:
+-----------------------
+
+>> docker run -d \
+     --name ecommerce-ui-test
+     -p 4000:4000 
+     ecommerce-ui:v1
+
+Check the containes and their logs
+----------------------------------
+>> docker ps
+>> docker logs ecommerce-ui-test
+
+Test the application
+---------------------------------
+
+Test the liveness endpoint
+--------------------------
+>> curl -i http://localhost:4000/health/live
+Expected HTTP status 200 OK
+
+Expected JSON response:
+
+{
+  "status": "alive",
+  "service": "ecommerce-ui"
+}
+
+
+This confirms that the gateway is responding to HTTP requests
+it does not verify that all the backend microservice are available
+
+Test 2: Test the frontend
+--------------------------
+>> curl -I http://localhost:4000/
+
+Expected HTTP status:
+200 OK
+
+This confirms that the application responds to a request for the homepage.
+It does not guarantee that every frontend feature works.
+
+
+Test 3: Open the application in a browser
+-----------------------------------------
+
+Open: http://localhost:4000
+
+The react appplication should load 
+
+

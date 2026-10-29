@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: product-inventory-policy
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: product-inventory
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  podSelector: 
+    matchLabels: 
+      app.kubernetes.io/name: product-inventory
+  policyTypes: 
+    - Ingress
+    - Egress
+  ingress:
+    - from: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/name: api-gateway
+      ports: 
+        - protocol: TCP
+          port: 3002
+  egress:
+    - to: 
+        - podSelector: 
+            matchLabels:
+              app.kubernetes.io/name: invnetory-postgres
+      ports: 
+        - protocol: TCP
+          port: 5432
+    - to: 
+        - namespaceSelector: 
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector: 
+            matchLabels: 
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+
+

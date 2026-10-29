@@ -1,0 +1,248 @@
+Product Catalog Microservice
+----------------------------
+Our Product Catalog microservice is responsible for retrieving product information from a database and return it to the client
+
+For example, when a customer opens an e-commerce website, they might see:
+- Laptop — ₹50,000
+- Mobile — ₹20,000
+- Headphones — ₹2,000
+The Product Catalog microservice provides this information.
+
+Technologies used : 
+| Component            |          Purpose    |
+
+Node.js	                Executes our JavaScript application
+Express.js            	Creates REST API endpoints
+MongoDB	                Stores product information
+MongoDB Driver          Allows Node.js to communicate with MongoDB
+index.js                Main application file
+products.json         	Contains initial product information
+package.json     	Defines application dependencies
+Docker	                Packages the application into a container
+Port 3001              	Exposes the Product Catalog API
+
+
+Understanding the API endpoints:
+
+Endpoin                  t	Purpose
+GET /api/products	Returns all products
+GET /api/products/:id	Returns a specific product
+GET /health/live	Checks whether the application is running
+GET /health/ready	Checks whether the application can communicate with MongoDB
+
+Step-by-step explanation
+Step 1: Customer requests products
+The customer opens the products page of the e-commerce website.
+The frontend sends an HTTP request:
+GET /api/products
+
+Step 2: Product Catalog receives the request
+Express.js receives the request on port 3001.
+It identifies the matching API endpoint.
+
+Step 3: Application queries MongoDB
+The application uses the MongoDB driver to communicate with the database.
+It requests all documents from the products collection.
+
+Step 4: MongoDB retrieves the data
+MongoDB searches the collection and returns the available product records.
+
+Step 5: Product Catalog sends the response
+The application converts the result into a JSON HTTP response.
+
+Step 6: Frontend displays the products
+The frontend receives the JSON data and displays the product information to the customer.
+
+
+              START APPLICATION
+                      |
+                      v
+                Run index.js
+                      |
+                      v
+          Read Environment Variables
+                      |
+                      v
+          Create MongoDB Connection
+                      |
+                      v
+             Connect to MongoDB
+                      |
+                      v
+          Select products_db Database
+                      |
+                      v
+          Select products Collection
+                      |
+                      v
+          Check Collection Document Count
+                      |
+                      v
+              Is Collection Empty?
+                  /         \
+                YES          NO
+                 |            |
+                 v            |
+         Read products.json   |
+                 |            |
+                 v            |
+         Insert Products      |
+                 |            |
+                 +------------+
+                      |
+                      v
+          Start Express Server
+                      |
+                      v
+              Listen on 3001
+                      |
+                      v
+          READY TO ACCEPT REQUESTS
+
+
+
+environment variables required: 
+PORT=3001
+MONGODB_HOST=ecommerce-mongo
+MONGODB_PORT=27017
+MONGODB_DATABASE=products_db
+
+
+
+After writing the docker file for this test the system by running these thhings:
+
+First create a docker network: 
+>> docker network create ecommerce-net
+
+Create a persistent volume: 
+>> docker volume create ecommerce-mongo-data
+
+for the mongodb to store the data when so that the data remain persistant
+
+Start the monogDB:
+>> docker run -d \
+  --name ecommerce-mongo \
+  --network ecommerce-net \
+  -v ecommerce-mongo-data:/data/db \
+  mongo:6.0
+
+Run the microservice : 
+docker run -d \
+  --name product-catalog \
+  --network ecommerce-net \
+  -p 3001:3001 \
+  -e PORT=3001 \
+  -e MONGODB_HOST=ecommerce-mongo \
+  -e MONGODB_PORT=27017 \
+  -e MONGODB_DATABASE=products_db \
+  product-catalog:v1
+
+
+
+Test the application: 
+
+check the containers: 
+>> docker ps
+
+Check the product catalogs: 
+>> docker logs product-catalog
+
+response: 
+Connected to MongoDB
+Initial products inserted
+Product Catalog running on port 3001
+
+Test the liveness:
+>> curl http://localhost:3001/health/live
+
+response: 
+{
+  "status": "alive",
+  "service": "product-catalog"
+}
+
+test the readiness: 
+>> curl http://localhost:3001/health/ready
+
+response: 
+{
+  "status": "ready",
+  "database": "connected"
+}
+
+test graceful shutdown:
+>> docker stop product-catalog
+>> docker logs --tail 15 product-catalog
+
+expected message: 
+>>
+Received SIGTERM. Shutting down...
+Graceful shutdown completed
+
+
+
+Important: A PVC helps preserve database data, but it doesn't automatically provide database replication or high availability. We'll begin with a single MongoDB instance for local development.
+
+
+
+Kubernetes configuration: 
+
+>> minikube status
+type: Control Plane
+host: Running
+kubelet: Running
+apiserver: Running
+kubeconfig: Configured
+
+You should see that the host, kubelet, and Kubernetes API server are running.
+
+
+
+Next verify that the  kubectl can communicate  with the cluster: 
+
+>> kubectl get nodes
+NAME       STATUS   ROLES           AGE   VERSION
+minikube   Ready    control-plane   ...   v1.35.1
+
+create the kubernetes directories: 
+
+cd ~/production-ecommerce-k8s
+
+mkdir -p infrastructure/kubernetes/base/product-catalog
+mkdir -p infrastructure/kubernetes/databases/mongodb
+
+
+* base/product-catalog/ will contain the Kubernetes configuration for the Product Catalog application.
+* databases/mongodb/ will contain MongoDB's configuration and persistent storage resources.
+
+
+
+
+for the persistant storage of the  data of the mongo db we need to create the pvc in the minikube there is no need of specifing the storage class 
+
+but in amazon eks  we must create the storageclassfirst:
+
+>> storageclass.yaml
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+
+metadata:
+  name: gp3
+
+provisioner: ebs.csi.aws.com
+
+parameters:
+  type: gp3
+  encrypted: "true"
+
+volumeBindingMode: WaitForFirstConsumer  # it delays volume provisioning untile kubernetes know where the pod can be scheduled so that i can create the volume in the same az as the pod or worker node
+
+reclaimPolicy: Retain      # this tells what will  happen to the volume when the  pvc is deleted
+
+
+allowVolumeExpansion: true  # this allows you to increase the pvc's requested storage capacity later
+
+
+
+Important: A PDB does not prevent hardware failures, pod crashes, or every type of deletion. It primarily protects against voluntary disruptions that use the Kubernetes Eviction API.

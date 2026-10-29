@@ -1,0 +1,24 @@
+# ___________________________________________
+# stage 1: Install production dependencies
+#____________________________________________
+
+FROM node:24-bookworm-slim AS dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# ___________________________________________
+# stage 2: Production runtime
+#____________________________________________
+
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --chown=node:node index.js products.json ./
+USER node
+EXPOSE 3001
+CMD [ "node","index.js"]
+
+
+

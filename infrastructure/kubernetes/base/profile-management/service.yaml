@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: profile-management
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: profile-management
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: profile-management
+
+  ports:
+    - name: http
+      port: 3003
+      targetPort: http
+      protocol: TCP

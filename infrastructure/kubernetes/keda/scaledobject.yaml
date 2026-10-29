@@ -1,0 +1,30 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: 
+  name: order-worker-scaler
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: order-worker
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  scaleTargetRef: 
+    name: order-worker
+  pollingInterval: 15
+  cooldownPeriod: 60
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  triggers:
+    - type: rabbitmq
+      metadata: 
+        protocol: http
+        host: http://rabbitmq.rabbitmq.svc.cluster.local:15672/
+        queueName: order-events
+        mode: QueueLength
+        value: "5"
+        activationValue: "0"
+        vhostName: /
+      authenticationRef:
+        name: order-worker-rabbitmq-auth
+
+
+

@@ -1,0 +1,32 @@
+FROM python:3.12-slim-bookworm AS builder
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir  --upgrade pip \
+    && pip install  --no-cache-dir --prefix=/install -r requirements.txt
+
+
+FROM python:3.12-slim-bookworm
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+# COPY THE INSTALLED DEPENDENCIES FROM THE BUILD STAGE
+COPY --from=builder /install /usr/local
+# copy the application source code
+
+COPY server.py .
+RUN groupadd --system --gid 10007 appgroup \
+    && useradd --system \
+       --uid 10007 \
+       --gid appgroup \
+       --no-create-home \
+       appuser \ 
+    && chown -R 10007:10007 /app
+
+USER 10007:10007
+
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--timeout", "30", "--access-logfile", "-", "--error-logfile", "-", "server:app"]
+

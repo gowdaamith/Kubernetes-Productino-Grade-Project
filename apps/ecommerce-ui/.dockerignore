@@ -1,0 +1,30 @@
+# Git metadata
+.git
+.gitignore
+
+# Node.js dependencies installed on the host
+**/node_modules
+
+# Local environment files and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/logs
+
+# React build output
+client/build
+
+# Test coverage
+**/coverage
+
+# Editor and operating-system files
+**/.DS_Store
+**/Thumbs.db
+**/.vscode
+**/.ideaDockerfile
+README.md

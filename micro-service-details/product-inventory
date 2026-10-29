@@ -1,0 +1,156 @@
+Our product inventory microservice uses:
+
+components                          purpose
+
+Python                          Runs the application
+PostgreSQL                      Store the inventory data
+Port 3002                       Exposes the inventory API
+Docker                          Packages the application
+Kubernetes Deployment           Runs the application pods
+Kubernetes Service             Provides internal network access
+ConfigMap                      Stores non-sensitive configuration
+Secrets                         Stores database credentials
+
+
+Before creating the dockerfile we need to idnetify : 
+1.Which python framework the application uses
+2.Which postgreSql environment variables it expects
+2.How it connects to the POSTGRESSQL
+4.Which API endpoint it exposes
+5.Whether it already has health-check endpoints
+6.HOw the application starts
+
+Product Inventory Microservice
+
+Our Product Inventory microservice is responsible for tracking and managing the available quantity of each product in the e-commerce application.
+
+While the Product Catalog microservice provides product information, the Product Inventory microservice tells us how many units of each product are available.
+
+For example, a customer might see the following inventory information:
+
+Laptop — 100 units available
+Mobile — 50 units available
+Headphones — 75 units available
+
+When a customer places an order, the Product Inventory microservice reduces the available quantity of the corresponding product.
+
+For example, if a product has 100 units available and a customer orders one unit, the inventory becomes 99.
+
+The microservice stores this information in a PostgreSQL database.
+
+
+Technologies used:
+
+Component                   Purpose
+
+Python                   Executes our application code
+Flask                    Create a Rest API endpoint
+postgrSql                stores product inventory information
+pycopg2                  allow the python to communicate with the postgreSQL
+ThreadedConnectionPool   Manages reusable database connection
+Gunicorn                 Runs the Flask application using a production-oriented WSGI server
+
+
+
+
+
+3. Understanding the API Endpoints
+
+HTTP Method            Endpoint                      Purpose
+
+GET                  /api/inventory       Returns inventory information for all products
+
+GET           /api/inventory/<product_id> Returns inventory information for one product
+
+POST          /api/order/<product_id>     Attempts to reduce the inventory quantity by one
+
+GET                /health/live           Checks whether the application is running
+
+GET                 /health/ready        Checks whether the application can communicate w                                            with PostgreSQL
+
+
+Environmental variables requried: 
+
+PORT=3002
+POSTGRES_HOST=postgresql
+POSTGRES_PORT=5432
+POSTGRES_DB=inventory_db
+POSTGRES_USER=inventory_user
+POSTGRES_PASSWORD=<stored securely>
+
+Build the docker image : of this product inventory  and use the docker postgres container test the the application locally before building the  kubernetes file or infrastructure for the project
+
+>> docker network create inventory-net
+>> docker volume create inventory-postgres-data
+
+>>docker build -t product-inventory:v2 .
+>>docker run -d \
+  --name inventory-postgres \
+  --network inventory-net \
+  -e POSTGRES_DB=inventory_db \
+  -e POSTGRES_USER=inventory_user \
+  -e POSTGRES_PASSWORD=LocalInventoryPass123 \
+  -v inventory-postgres-data:/var/lib/postgresql/data \
+  postgres:15
+
+>> docker run -d \
+  --name product-inventory \
+  --network inventory-net \
+  -p 3002:3002 \
+  -e PORT=3002 \
+  -e POSTGRES_HOST=inventory-postgres \
+  -e POSTGRES_PORT=5432 \
+  -e POSTGRES_DB=inventory_db \
+  -e POSTGRES_USER=inventory_user \
+  -e POSTGRES_PASSWORD=LocalInventoryPass123 \
+  product-inventory:v2
+
+>> docker logs product-inventory
+
+Test the health endpoints: 
+
+>> curl http://localhost:3002/health/live
+
+output: 
+{
+  "service": "product-inventory",
+  "status": "alive"
+}
+
+>> curl http://localhost:3002/health/ready
+
+output: 
+{
+  "database": "connected",
+  "status": "ready"
+}
+
+Test the inventory API
+>>  curl http://localhost:3002/api/inventory
+>> curl http://localhost:3002/api/inventory/1
+
+>> curl -X POST http://localhost:3002/api/order/1
+>> curl http://localhost:3002/api/inventory/1
+
+after writing the deployment.yaml and service.yaml
+use teh port forward command to check wheather the service is running or not 
+
+kubectl port-forward -n ecommerce \
+  svc/product-inventory 3002:3002
+
+Keep this terminal running and move to the another terminal and check : 
+>> curl http://localhost:3002/health/live
+
+output: {
+  "status": "alive",
+  "service": "product-inventory"
+}
+
+>> curl http://localhost:3002/health/ready
+
+output: {
+  "status": "ready",
+  "database": "connected"
+}
+
+

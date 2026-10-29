@@ -1,0 +1,541 @@
+Order Management Microserivce
+
+Our order management microservice  is responsible for managing  a customers shopping cart , calculating the order subtotal and shipping chargees and processing purchases 
+
+Its acts as the central co-ordinator between several microservices in our ecommerce application 
+
+For example, imagine a customer wants to purchase a pair of wireless headphones.
+
+The customer selects the headphone and adds them to the shopping cart
+The order management microservice communicates with the other microservices to :
+
+* Retrieve the product's information from the product catalog
+* Check the product availability through product inventory
+* Calculate the products shipping  charges through shipping and handling
+* Stoes teh customer's cart and order information in the mongodb
+* Processes the purchases by requesting an inventory update
+* Updates teh order status to indicate whether the purchase was completed
+
+
+The Order Management microservice does not directly manage the product catalog, inventory database, or shipping database. Instead, it communicates with the respective microservices through REST APIs.
+
+Technologies Used
+
+Component				   Purpose
+
+Java 17	             	Provides the programming language and runtime target                        for the application.
+
+Spring Boot             Simplifies application development and provides auto                        matic configuration.
+
+Spring Web              Creates REST API endpoints and handles HTTP requests                        and responses.
+
+RestTemplate            Allows the application to send HTTP requests to othe                        r microservices.
+
+Spring Data MongoDB     Provides integration with MongoDB and repository-bas                        ed database operations.
+
+MongoDB			Stores shopping carts and order information.
+
+Maven                   Manages Java dependencies, compiles the application,                        runs tests, and packages the application into a JAR                         file.
+
+OrderManagementApplication.java		Main entry point of the Spring Boot                                         application.
+
+OrderController.java                    Receives HTTP requests and exposes t                                        he Order Management API endpoints.
+
+OrderService.java                       Contains the business logic for cart                                        s, order calculations, and purchases
+
+Order.java                             Represents an order stored in MongoDB
+
+
+CartItem.java			       Represents an individual product in                                         a shopping cart.
+
+Product.java                           Represents product information retrie                                       ved from Product Catalog and shipping                                       information received from Shipping  a                                       nd Handling.
+
+InventoryResponse.java                 Represents the inventory response ret                                       urned by Product Inventory.
+
+OrderRepository.java		       Provides database operations for stor                                       ing and retrieving orders.
+
+application.properties                 Defines application settings, microse                                       rvice URLs, and MongoDB configuration
+
+Docker                                 Packages the application and its run                                        time into a container image.
+
+Port 9090                              Exposes the Order Management API.
+
+Important limitation: Your current inventory API does not accept a purchase quantity for this operation. Therefore, Order Management must not assume that purchasing a cart item with a quantity greater than one will decrement inventory by that quantity. The inventory API and purchase logic will need to be enhanced before supporting reliable multi-unit purchases.
+
+The following endpoints are exposed by the order management controller
+-------------------------------------------------------------------------
+
+HTTP                ENDPOINT                    PURPOSE
+
+POST         /api/orders/{userId}/cart        Adds the product to the user                                                shopping cart
+GET          /api/orders/{userId}/cart        Retrieves the users' current
+                                              cart
+GET         /api/ordres/{userId}/cart/shippingCalculates the carts shipping                                               Charges
+GET         /api/orderes/{userId}/cart/total  calcultes the lotal cost 
+                                              including the shipping
+POST        /api/orderes/{userId}/purchase    Processes the purchase and 
+                                              Updates the order status
+GET         /api/orders/{userId}/history      Retrieves the user's order his                                              tory , if this endpoint is 
+                                              is present in the controller 
+                                               version you are using
+
+
+Step by Step Explanation of how the Order management works:
+
+Step 1: Customer adds the product to the cart
+----------------------------------------------
+
+The customer selects a product on the e-commerce website.
+The frontend sends a request to Order Management.
+
+Example:
+POST /api/orders/101/cart
+Order management receives the request through OrderController
+The controller calls OrderService to perform the operation.
+
+
+Step 2: Order Management retrieves product information
+--------------------------------------------------------
+Order Management communicates with Product Catalog.
+
+It sends a request similar to:
+GET /api/products/1
+
+Product Catalog retrieves the product information from MongoDB and returns a JSON response.
+
+Order Management uses this information to represent the product in the cart.
+
+
+
+Step 3: Order Management saves the cart
+--------------------------------------------------------
+Order Management checks whether the customer already has a pending cart.
+If a pending cart exists, it adds the product to that cart.
+
+Otherwise, it creates a new order with the PENDING status.
+The order is then saved in MongoDB's orders_db database.
+
+
+Step 4: Customer requests the cart subtotal
+----------------------------------------------------------
+The frontend sends:
+>> GET /api/orders/101/cart/subtotal
+
+Order Management calculates the subtotal from the product prices and quantities stored in the cart
+
+
+Step 5: Order Management calculates shipping charges
+----------------------------------------------------------
+
+The frontend requests:
+GET /api/orders/101/cart/shipping
+
+Order management communicates with shipping and handling for the product in  the cart 
+
+The shipping service returns the application shipping fee
+
+Step 7: Customer confirms the purchase
+----------------------------------------------------------
+
+When the customer confirms the purchase , the frontend sends 
+POST /api/orders/101/purchase
+
+Order management begins the purchase workflow
+First, it checks whether a pending cart exists and whether the required inventory is available.
+
+If the checks pass, it changes the order status to PROCESSING and saves that status in MongoDB.
+
+Step 8: Order management updates the inventory
+-----------------------------------------------------------
+Order Management sends an HTTP request to Product Inventory for each cart item.
+
+For example:
+
+POST /api/order/1
+
+The inventory service attempts to decrement the product's stock by one.
+If an inventory update fails, the current implementation marks the order REQUIRES_REVIEW rather than automatically retrying a potentially partially completed purchase.
+
+This is important because inventory updates across multiple services are not one atomic database transaction.
+
+
+Step 9: Order management updaates the order status
+---------------------------------------------------------
+If all inventory updates succeed, Order Management marks the order COMPLETED and saves the updated order in MongoDB.
+
+The application retains the order's items as part of the order record.
+
+The frontend can then inform the customer that the purchase operation completed.
+
+Flow : 
+START APPLICATION
+        |
+        v
+Run OrderManagementApplication.java
+        |
+        v
+Initialize Spring Boot
+        |
+        v
+Load application.properties
+        |
+        v
+Configure RestTemplate
+        |
+        v
+Configure MongoDB Connection
+        |
+        v
+Initialize Application Components
+        |
+        v
+Start Embedded Web Server
+        |
+        v
+Listen on Port 9090
+        |
+        v
+READY TO ACCEPT REQUESTS
+        |
+        v
+Customer Sends API Request
+        |
+        v
+OrderController Receives Request
+        |
+        v
+OrderService Executes Business Logic
+        |
+        +------------------------------+
+        |              |               |
+        v              v               v
+  Product Catalog  Product Inventory  Shipping and
+                                     Handling
+        |              |               |
+        +--------------+---------------+
+                       |
+                       v
+              Process the Request
+                       |
+                       v
+             Save or Retrieve Order
+                from MongoDB
+                       |
+                       v
+              Return HTTP Response
+                       |
+                       v
+              Frontend Displays Result
+
+
+Environmental variable:
+
+SERVER_PORT    9090 Configure the applciation port
+PRODUCTION_INVENTORY_API_HOST  http://localhost:3002  specifies the product
+                                                      inventory base URL
+PRODUCT_CATALOG_API_HOST       http://localhost:3001  specifies the product                                                       catalog base URL
+SHIPPING_HANDLING_API_HOST     http://localhost:8080  specifies the shipping                                                      & handling base url
+SPRING_DATA_MONGODB_URI        mongodb://localhost:   specifies the mongoDB                                27017/orders_db         connection url
+SPRING_DATA_MONGODB_DATABASE   orders_db              specifies the mongodb
+                                                      database name 
+
+The value are for the local development :
+Inside the kubernetes the microservice URL's should use the actual kubernetes service names
+
+PRODUCT_INVENTORY_API_HOST=http://product-inventory:3002
+
+PRODUCT_CATALOG_API_HOST=http://product-catalog:3001
+
+SHIPPING_HANDLING_API_HOST=http://shipping-and-handling:8080
+
+SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/orders_db
+
+SPRING_DATA_MONGODB_DATABASE=orders_db
+
+Docker Testing Plan: 
+----------------------
+
+After creating the Dockerfile , we will build and test the order management containers before deploying it to kubernetes
+
+Step 1: Verify the generated JAR file
+--------------------------------------
+
+cd ~/production-ecommerce-k8s/apps/order-management
+ls -lh target/*.jar
+                               
+
+This verifies that maven generated the application package or not
+
+Step 2: Create the Docker image
+--------------------------------------
+We will create a Dockerfile that packages the Spring Boot JAR into a Java 17 runtime image.
+
+Then we will build the image using a name such as: 
+order-management:v1
+
+Step 3 : Prepare the Docker network
+------------------------------------
+Create a network local container-t0-container communication
+
+>> docker network create ecommerce-net
+
+If this network already exits , reuse it rather than attempting to create it again
+
+Step 4: Start the required dependencies
+----------------------------------------
+Order Management requires MongoDB and communicates with Product Catalog, Product Inventory, and Shipping and Handling.
+
+We must start the required containers on the same Docker network and configure their environment variables appropriately.
+
+docker volume create ecommerce-mongo-data
+
+docker run -d \
+  --name ecommerce-mongo \
+  --network ecommerce-net \
+  -v ecommerce-mongo-data:/data/db \
+  mongo:6.0
+
+
+
+Important: Your other microservices also use MongoDB. Before starting another MongoDB container, check whether your existing containers already provide the databases needed for this test. Reuse the appropriate database container where possible, and ensure Order Management can reach it.
+
+Step 5: Run order management
+-----------------------------
+Step 5: Run Order Management
+
+After the Dockerfile has been created and the image built, we will start the Order Management container with:
+
+Port 9090
+MongoDB connection settings
+Product Catalog URL
+Product Inventory URL
+Shipping and Handling URL
+
+The exact command will depend on the final Dockerfile and the names of the running dependency containers.
+
+Step 6: Check the running container
+-----------------------------------
+
+>> docker ps
+
+Step 7: Check application logs
+-----------------------------------
+>> docker logs order-management
+
+This helps us determine whether Spring Boot started successfully and whether there are configuration or database connection errors.
+
+Step 8 : Test the healthy endpoints: 
+-------------------------------------
+
+Because the application exposes Spring Boot Actuator's health endpoint, we can test
+>> curl http://localhost:9090/actuator/health
+A healthy application should return a response indicating its health status.
+
+If the response reports that a dependency is unavailable , we will investigate the corresponding connection
+
+Step 9:  Test the  order management API's
+---------------------------------------------
+
+Once the application is running and its dependencies are available, we will test the cart endpoints.
+
+
+>> curl http://localhost:9090/api/orders/101/cart
+
+
+
+We will also test the subtotal, shipping, total, and purchase endpoints using the HTTP methods specified by the controller.
+
+
+Step 10: Test the gracefull shutdown
+--------------------------------------------
+>> docker stop order-management
+
+then inspect the final logs: 
+>> docker logs --tail 30 order-management
+
+we will verify that the application shuts down cleanly and releases its resources 
+
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Check the product inventory: 
+>> curl -i http://localhost:3002/api/inventory/1
+
+This checks whether product ID 1 has available stock. Ensure the Product Inventory port-forward is running.
+
+1.Add the product to the cart 
+----------------------------
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s$ curl -i -X POST \
+  http://localhost:9090/api/orders/1001/cart \
+  -H "Content-Type: application/json" \
+  -d '{"id":1}'
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 25
+Date: Sat, 24 Oct 2026 12:54:45 GMT
+
+Product added to the cart
+
+2.Retrieve the Cart
+-------------------------------
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s$amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s$ curl -i \
+  http://localhost:9090/api/orders/1001/cart
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:02:53 GMT
+
+[{"productId":1,"quantity":1,"name":"Wireless Bluetooth Headphones","description":"High-quality sound and comfortable fit","price":59.99,"category":"Electronics"}]
+
+3.check  the Subtotal
+-------------------------------
+
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecomcurl -i \$ curl -i \
+  http://localhost:9090/api/orders/1001/cart/subtotal
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:03:03 GMT
+
+59.99amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s$
+
+
+4.Calculate the shipping charges
+------------------------------------
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s/micro-service-details$ curl -i http://localhost:9090/api/orders/1001/cart/shipping
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:07:44 GMT
+
+10.0
+
+
+5.Calculate the final total
+---------------------------------------
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s/micro-service-details$ curl -i http://localhost:9090/api/orders/1001/cart/total
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:08:33 GMT
+
+69.99000000000001
+
+6.Review the Cart
+-----------------------------------------
+>> curl -i http://localhost:9090/api/orders/1001/cart
+
+amith26@LAPTOP-4DUIV0LS:~$ curl -i http://localhost:9090/api/orders/1001/cart
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:10:22 GMT
+
+[{"productId":1,"quantity":1,"name":"Wireless Bluetooth Headphones","description":"High-quality sound and comfortable fit","price":59.99,"category":"Electronics"}]
+
+7.Test shipping through Order management
+-----------------------------------------
+
+curl -i \
+  http://localhost:9090/api/orders/1001/cart/shipping
+
+amith26@LAPTOP-4DUIV0LS:~$ curl -i \
+  http://localhost:9090/api/orders/1001/cart/shipping
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:11:27 GMT
+
+10.0
+
+
+This  tests completes request path:
+
+Client
+  |
+  v
+Order Management :9090
+  |
+  v
+Shipping and Handling :8080
+  |
+  v
+Shipping fee returned to Order Management 
+
+
+Step 8: Purchase from the cart
+-----------------------------------------
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s/micro-service-details$ curl -i -X POST \
+  http://localhost:9090/api/orders/1001/purchase
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 31
+Date: Sat, 24 Oct 2026 13:14:37 GMT
+
+Purchase completed successfully
+
+
+Step 9 : verify the order history and checck the inventory and verify the cart 
+--------------------------------------------
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s$ curl -i http://localhost:9090/api/orders/1001/history
+HTTP/1.1 200
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Sat, 24 Oct 2026 13:16:44 GMT
+
+[{"id":"6adcaa95030c575b4e228f02","userId":1001,"items":[{"productId":1,"quantity":1,"name":"Wireless Bluetooth Headphones","description":"High-quality sound and comfortable fit","price":59.99,"category":"Electronics"}],"status":"COMPLETED"}]
+
+
+
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s/micro-service-details$ curl -i http://localhost:3002/api/inventory/1
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 24 Oct 2026 13:15:37 GMT
+Connection: close
+Content-Type: application/json
+Content-Length: 23
+Access-Control-Allow-Origin: *
+
+{"id":1,"quantity":99}
+amith26@LAPTOP-4DUIV0LS:~/production-ecommerce-k8s/micro-service-details$ curl -i http://localhost:9090/api/orders/1001/cart\
+>
+HTTP/1.1 404
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Content-Length: 0
+Date: Sat, 24 Oct 2026 13:15:49 GMT
+
+

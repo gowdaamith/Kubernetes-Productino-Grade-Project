@@ -1,0 +1,47 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata: 
+  name: profile-management-policy
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: profile-management
+    app.kubernetes.io/part-of: ecommerce
+spec:
+  podSelector: 
+    matchLabels: 
+      app.kubernetes.io/name: profile-management
+  policyTypes: 
+    - Ingress
+    - Egress
+  ingress:
+    - from: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/name: api-gateway
+      ports:
+        - protocol: TCP
+          port: 3303
+
+  egress:
+    - to: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/name: profile-mysql
+      ports:
+        - protocol: TCP
+          port: 3306
+    - to: 
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/metadata.name: kube-system
+          podSelector: 
+            matchLabels: 
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+

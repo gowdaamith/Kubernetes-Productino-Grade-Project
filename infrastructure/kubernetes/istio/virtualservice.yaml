@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: 
+  name: ecommerce-ui
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  hosts:
+    - ecommerce.local
+  gateways: 
+    - ecommerce-gateway
+  http:
+    - match: 
+        - uri: 
+            prefix: /
+      route: 
+        - destination: 
+            host: ecommerce-ui.ecommerce.svc.cluster.local
+            port:
+              number: 80
+
+
+

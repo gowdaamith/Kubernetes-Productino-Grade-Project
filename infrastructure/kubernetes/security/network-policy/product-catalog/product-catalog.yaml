@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: product-catalog-ingress
+  namespace: ecommerce
+spec:
+  podSelector: 
+    matchLabels: 
+      app.kubernetes.io/name: product-catalog
+  policyTypes:
+    - Ingress
+  ingress: 
+    - ports:
+        - protocol: TCP
+          port: 3001
+

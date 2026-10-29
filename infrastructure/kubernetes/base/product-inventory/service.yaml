@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: product-inventory
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: product-inventory
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: product-inventory
+
+  ports:
+    - name: http
+      port: 3002
+      targetPort: http
+      protocol: TCP

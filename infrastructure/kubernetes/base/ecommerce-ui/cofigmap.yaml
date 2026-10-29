@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: ecommerce-ui-config
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: ecommerce-ui
+    app.kubernetes.io/part-of: ecommerce-platform
+
+data:
+  NODE_ENV: "production"
+  PORT: "4000"
+
+  PROFILE_API_URL: "http://profile-management:3003"
+  PRODUCT_API_URL: "http://product-catalog:3001"
+  INVENTORY_API_URL: "http://product-inventory:3002"
+  ORDER_API_URL: "http://order-management:9090"
+  SHIPPING_API_URL: "http://shipping-and-handling:8080"
+  CONTACT_API_URL: "http://contact-support-team:8000"

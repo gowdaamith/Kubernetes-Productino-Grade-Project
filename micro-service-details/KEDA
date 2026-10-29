@@ -1,0 +1,382 @@
+KEDA
+
+KEDA stands for  kubernetes Event driven Autoscaling  
+
+This is a component that allows kubernetes workloads to scale based on external event metrics 
+
+We already use HPA to scale application pods based on CPU utilization . KEDA can extend this approach to event-driven workloads
+
+          Customer places orders
+                    |
+                    v
+             Orders enter queue
+                    |
+                    v
+              KEDA monitors
+              queue length
+                    |
+                    v
+          Kubernetes scales Pods
+                    |
+          +---------+---------+
+          |         |         |
+          v         v         v
+        Pod 1     Pod 2     Pod 3
+          |         |         |
+          +---------+---------+
+                    |
+                    v
+             Process orders
+
+The current Order management service must support a suitable event source before we can use a queue-based scaling 
+
+KEDA can also use supported external metrics sources, depending on the workload and configuration.
+
+__________________________________________________________________________
+
+KEDA does not automatically replace your existing  HPA. For  a workload managed by a KEDA ScaleObject , KEDA generally creates and manages an HPA based on the configured trigger .We must therefore  avoid creating conflicting autoscaling controllers for the same deployment
+
+Means we should either do HPA  or KEDA
+
+Important: Your current Order Management service does not automatically become queue-driven just because KEDA is installed. We would need to integrate a supported message queue and configure the application to process queued work.
+__________________________________________________________________________
+
+In this project we will implement the KEDA for the ordermanagement service
+
+--------------------------------------------------------------------------
+Things we will look into before  moving to or upgrading the Ordermanagement service is :
+
+1.Inspect the current Order management application and its deployment
+2.Determine whether it already has an event source or message queue
+3.Choose an appropriate KEDA scaler based on that architecture
+4.Install KEDA if it isn't already installed
+5.Configure event driven scaling for the selected workload
+6.Test scaling  up and down
+7.Verify that existing order processing continues to work
+
+We'll leave the other five HPA untouched
+---------------------------------------------------------------------------
+
+Order Management
+--------------------
+
+Scenario: Imagine your ecommerce application  receives  100 orders  within a short period 
+With CPU based HPA ,kubernetes react to CPU utilization . However ,queued orders can accumulate before CPU utilization reaches the scaling threshold
+cd ~/production-ecommerce-k8s
+
+mkdir -p infrastructure/kubernetes/keda/order-worker
+With KEDA and a message queue, Kubernetes can scale workers based on the number of pending orders.
+
+
+Important: Your current Order Management service does not automatically become queue-driven just because KEDA is installed. We would need to integrate a supported message queue and configure the application to process queued workImportant: Your current Order Management service does not automatically become queue-driven just because KEDA is installed. We would need to integrate a supported message queue and configure the application to process queued work.
+
+
+For the order management we will use : 
+>> KEDA AND RABBITMQ  to demonstrate event driven scaling for order management
+
+             Ecommerce UI
+                   |
+                   v
+            Order Management
+                   |
+                   v
+              RabbitMQ Queue
+                   |
+                   v
+                 KEDA
+                   |
+          Monitors queue length
+                   |
+                   v
+        Scales the worker Deployment
+             /      |      \
+            v       v       v
+         Worker  Worker  Worker
+            1       2       3
+
+
+RabbitMQ queue
+      |
+      v
+RabbitMQ scaler in KEDA
+      |
+      v
+KEDA exposes external metrics
+      |
+      v
+Horizontal Pod Autoscaler (HPA)
+      |
+      v
+Updates Deployment's desired replica count
+      |
+      v
+Kubernetes creates additional Pods
+
+
+----------------------------------------------------------------------------
+
+
+KEDA Installation: 
+------------------
+
+First Check whether the helm is installed or not:
+>> helm --version
+
+If installed .Then add  the KEDA Helm repository 
+>> helm repo add kedacore https://kedacore.github.io/charts
+
+* helm repo add registers a chart repository.
+* kedacore is the local name we'll use for the repository.
+* The URL points to the official KEDA Helm charts.
+
+
+Update the helm repocd ~/production-ecommerce-k8s
+
+mkdir -p infrastructure/kubernetes/keda/order-worker
+>> helm repo update
+
+Check the available KEDA chart Version:
+>> helm search repo kedacore/keda
+
+Install KEDA 2.21.0
+>> helm install keda kedacore/keda \
+  --namespace keda \
+  --create-namespace \
+  --version 2.21.0
+
+Verify the Installation: 
+
+>> kubectl get pods -n keda
+
+We will get the KEDA operator , metrics API server  and admission webhook to become ready 
+
+Before deploying the RabbitMQ .Let's verify that kubernetes registered the resources KEDA needs 
+[Verify KEDA'S custom resources]
+
+>> kubectl get crd | grep keda.sh 
+
+cloudeventsources.eventing.keda.sh          2026-10-27T20:03:24Z
+clustercloudeventsources.eventing.keda.sh   2026-10-27T20:03:24Z
+clustertriggerauthentications.keda.sh       2026-10-27T20:03:24Z
+scaledjobs.keda.sh                          2026-10-27T20:03:24Z
+scaledobjects.keda.sh                       2026-10-27T20:03:24Z
+triggerauthentications.keda.sh              2026-10-27T20:03:24Z
+
+ Custom resource                                           Purpose 
+
+scaledobjects.keda.sh ->  Defines how KEDA scales a Deployment based on an external event source, such as a RabbitMQ queue. 
+
+triggerauthentications.keda.sh -> Defines authentication settings KEDA can use to connect to RabbitMQ. 
+
+
+ADD the official Bitnami Helm repository 
+------------------------------------------
+We'll install the bitnami RabbitMQ chart for out initial kubernetes demonstration 
+>> helm repo add bitnami https://charts.bitnami.com/bitnami
+
+
+Update the helm repo
+>> helm repo update
+
+Search the bitnami repo for rabbitmq
+>> helm search repo bitnami/rabbitmq
+
+Create a RabbitMQ namespace
+>> kubectl create namespace rabbitmq
+
+Create a Rabbitmq Secret YAML file
+>> vim rebbitmq-secret.yaml
+
+Create a Rabbitmq Helm values file
+>> vim rabbitmy-values.yaml
+
+Instead of putting all configuration in a long helm command , we'll store it in rabbitmq-values.yaml
+
+Next validate the configaration to check wheather the helm can successfully generate the kubernetes manifest from the helm chart without installing RabbitMQ into your cluster
+
+
+
+>> helm template rabbitmq bitnami/rabbitmq \
+  --namespace rabbitmq \
+  --version 16.0.14 \
+  --values rabbitmq-values.yaml \
+  > /tmp/rabbitmq-rendered.yaml
+
+To find the helm values use the following command
+>> helm show values bitnami/rabbitmq --version 16.0.14
+
+You can also search on the google for it
+
+>>If you want to see a particular setting you can search for: 
+
+helm show values bitnami/rabbitmq --version 16.0.14 \
+  | grep -n -A 15 '^clustering:'
+
+
+Examine the generated YAML and display its kubernetes resources kinds and names
+
+>> grep -E '^kind:|^  name:' /tmp/rabbitmq-rendered.yaml | head -40
+
+Check whether the files generated are using the content:
+
+>> grep -n -E 'image:|secretKeyRef:|name: rabbitmq-auth|storageClassName:|storage: 1Gi|volumeClaimTemplates:' /tmp/rabbitmq-rendered.yaml
+
+Install the RabbitMQ using the Helm
+>> helm install rabbitmq bitnami/rabbitmq \
+  --namespace rabbitmq \
+  --version 16.0.14 \
+  --values rabbitmq-values.yaml
+
+
+If something goes wrong  change the values.yaml or make the necessary changes and  Update the existing Helmm release rather than reinstalling it:
+
+>> helm upgrade rabbitmq bitnami/rabbitmq \
+  --namespace rabbitmq \
+  --version 16.0.14 \
+  --values rabbitmq-values.yaml
+
+Check the rabbitmq service
+>> kubectl get svc,endpoint -n rabbitmq
+
+Verify the rabbitmq authentication: 
+>> kubectl exec -n rabbitmq rabbitmq-0 -- \
+  rabbitmqctl authenticate_user ecommerce-worker \
+  "$(kubectl get secret rabbitmq-auth -n rabbitmq -o jsonpath='{.data.rabbitmq-password}' | base64 -d)"
+
+Check the RabbitMQ management Plugin
+>> kubectl exec -n rabbitmq rabbitmq-0 -- rabbitmq-plugins list -e
+
+Look explicitly for the rabbitmq_management .Because it use RabbitMQ's management HTTP API to retrieve the number of  queued messgaes
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+The next architecture will look like this :
+
+Order Management
+       |
+       | Publishes an order event
+       v
+    RabbitMQ
+       |
+       | Queue: order-events
+       v
+  Order Worker
+       |
+       | Processes messages
+       v
+  KEDA monitors queue length
+       |
+       v
+ Scales worker replicas
+
+
+Create a durable queue named order-events .Durable means the queue definition survives a RabbitMQ restart ,although message durability also depends on how message are published
+
+First check wheather the queue already exits or not:
+
+>> kubectl exec -n rabbitmq rabbitmq-0 -- \
+     rabbitmqctl list_queue name durable  messages 
+
+
+Step 1: Create  the order event queue using the HTTP API
+
+We'll forward the management port to your local machine, then use curl to create the queue. This avoids installing anything inside the RabbitMQ container.
+
+>> kubectl port-forward -n rabbitmq svc/rabbitmq 15672:156672
+
+Create the Order Event 
+
+>> RABBITMQ_PASSWORD="$(kubectl get secret rabbitmq-auth -n rabbitmq -o jsonpath='{.data.rabbitmq-password}' | base64 -d)"
+
+curl --fail-with-body --user "ecommerce-worker:${RABBITMQ_PASSWORD}" \
+  -H "content-type: application/json" \
+  -X PUT \
+  -d '{"durable":true,"auto_delete":false,"arguments":{}}' \
+  http://127.0.0.1:15672/api/queues/%2F/order-events
+
+unset RABBITMQ_PASSWORD
+
+
+verify order-events exits or not:
+
+>> RABBITMQ_PASSWORD="$(kubectl get secret rabbitmq-auth -n rabbitmq -o jsonpath='{.data.rabbitmq-password}' | base64 -d)"
+
+curl --silent --show-error --user "ecommerce-worker:${RABBITMQ_PASSWORD}" \
+  --output /dev/null \
+  --write-out 'HTTP status: %{http_code}\n' \
+  http://127.0.0.1:15672/api/queues/%2F/order-events
+
+unset RABBITMQ_PASSWORD 
+
+Verify the messages in the Queue:
+
+>> kubectl exec -n rabbitmq rabbitmq-0 -- \
+  rabbitmqctl list_queues name durable messages
+
+
+
+Next create a order worker that will consume the message in the rabbitmq
+published by the ordermanagement service
+
+Next create the Kubernetes manifests for this Order-woker:
+           File                                        Purpose  
+
+rabbitmq-secret.yaml    Stores the worker's RabbitMQ credentials in the 
+                          ecommerce` namespace. 
+deployment.yaml         Defines how Kubernetes runs the worker container. 
+scaledobject.yaml       Tells KEDA when and how to scale the worker based on                         RabbitMQ queue length.
+
+
+trigger-authenticatoin.yaml  KEDA needs credentials to access Rabbitmq mana 
+                             gemetn API and read the queue length .We'll re                              ference the existing secret in the commerce nam                             espace  rather than placing the credentials in                              the KEDA configuration.This can be done with th                             e help of the TriggerAuthentication resource
+
+
+activationVAlue: "0" 
+    Means the queue length at which the KEDA considers the queue active 
+      Zero means messages must be present to activate scaling from zero.
+        activationValue: "0"
+
+
+
+
+Rabbitmq virtual Host: [vhost]
+
+A RabbitMQ virtual host (vhost) is a logical separation inside a RabbitMQ server that allows you to organize and isolate messaging resources.
+
+Think of RabbitMQ as a building, and virtual hosts as separate rooms inside that building.
+Each room can have its own queues, exchanges, bindings, and permissions.
+
+
+                 RabbitMQ Server
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+       vhost: /    vhost: /orders  vhost: /payments
+          |            |            |
+          v            v            v
+       Queues       Queues         Queues
+          |            |            |
+          v            v            v
+      General       Order          Payment
+      Messages      Messages       Messages
+
+These virtual hosts logically separate messaging resources, even though they belong to the same RabbitMQ server.
+
+
+What does this mean:
+metadata:
+  queueName: order-events
+  vhostName: "/"
+
+queueName: order-events
+This tells KEDA which RabbitMQ queue to monitor.
+
+vhostName: "/"
+This tells KEDA which virtual host contains the order-events queue.
+In RabbitMQ, / is the default virtual host.
+
+
+Therefore, your configuration tells KEDA to monitor the order-events queue inside the default virtual host.
+
+

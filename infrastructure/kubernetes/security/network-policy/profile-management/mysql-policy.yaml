@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: mysql-policy
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: profile-mysql
+    app.kubernetes.io/part-of: ecommerce
+spec:
+  podSelector: 
+    matchLabels:
+      app.kubernetes.io/name: profile-mysql
+  policyTypes: 
+    - Ingress
+    - Egress
+  ingress:
+    - from: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/name: profile-management
+      ports:
+        - protocol: TCP
+          port: 3306
+  # no outgoing connections are permitted by this policy
+  egress: []
+

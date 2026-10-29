@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: shipping-and-handling
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: shipping-and-handling
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: shipping-and-handling
+
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

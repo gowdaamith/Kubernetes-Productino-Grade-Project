@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: order-management-config
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: order-management
+    app.kubernetes.io/part-of: ecommerce-platform
+data:
+   SERVER_PORT: "9090"
+
+   PRODUCT_INVENTORY_API_HOST: "http://product-inventory:3002"
+
+   PRODUCT_CATALOG_API_HOST: "http://product-catalog:3001"
+
+   SHIPPING_HANDLING_API_HOST: "http://shipping-and-handling:8080"
+
+   SPRING_DATA_MONGODB_URI: "mongodb://mongodb:27017/orders_db"
+
+   SPRING_DATA_MONGODB_DATABASE: "orders_db"
+
+   RABBITMQ_HOST: "rabbitmq.rabbitmq.svc.cluster.local"
+
+   RABBITMQ_PORT: "5672"
+   
+   RABBITMQ_VHOST: "/"
+  
+   ORDER_EVENTS_QUEUE: "order-events"
+  
+   ORDER_EVENTS_PUBLISHER_DELAY_MS: "2000"

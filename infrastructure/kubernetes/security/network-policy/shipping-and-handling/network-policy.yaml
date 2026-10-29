@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: shipping-and-handling-network-policy
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/name: shipping-and-handling
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-and-handling
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow requests from the Order Management microservice.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: order-management
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow connections to the MongoDB database.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+
+    # Allow DNS lookups through CoreDNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

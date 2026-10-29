@@ -1,0 +1,314 @@
+Shipping and Handling Microservice
+
+Our Shipping and Handling Microservice is responsible for calculating the shipping and handling fees for products in an e-commerce application.
+
+
+For example: 
+
+when a customer purchases a product, the shipping fee depends on the product's category and the time of the request.
+
+The microservice calculates the fee and returns the product details along with the shipping fee as a JSON response.
+
+For example, your application uses the following calculation:
+
+Base shipping fee: 5.0
+Electronics multiplier: 2.0
+Peak-hour surcharge: 3.0
+
+During non-peak hours:
+
+Shipping Fee = Base Fee × Category Multiplier
+Shipping Fee = 5.0 × 2.0 = 10.0
+
+During peak hours:
+
+Shipping Fee = (Base Fee × Category Multiplier) + Peak-Hour Surcharge
+Shipping Fee = (5.0 × 2.0) + 3.0 = 13.0
+
+Note: These values represent the numbers used by your application. The code does not specify a currency.
+
+
+Technologies Used
+
+Component                       Purpose
+
+Go (Golang)          Implements the shipping and handling application.
+
+net/http             Creates and runs the HTTP server and API endpoints.
+
+MongoDB              Stores product information used to calculate shipping fees.
+
+MongoDB Go Driver    Allows the Go application to communicate with MongoDB.
+
+main.go              Contains the application code, API handlers, database initialization, and shipping-fee calculation logic.
+
+go.mod               Defines the Go module and its dependencies.
+
+go.sum               Records dependency checksums.
+
+Docker               Packages the application and its runtime dependencies into a container image.
+
+Kubernetes           Deploys, manages, and scales the application.
+
+Port 8080            Exposes the Shipping and Handling API
+
+
+EndPOint                      method                 Purpose
+
+/shipping-fee?product_id=1     GET         Retrieves a product and calculates its shipping fee.
+
+/shipping-explanation          GET         Returns an explanation of the shipping-fee calculation.
+
+/all-shipping-fees             GET         Calculates and returns shipping fees for all products in MongoDB.
+
+/health/live                   GET         Intended liveness endpoint
+
+/health/ready                  GET         Intended readiness endpoint
+
+
+Step by Step Explanation: 
+
+Step 1: Customer requets a shipping fee:
+------------------------------------------
+A customer selects a product and proceeds toward checkout.
+The application needs to determine the shipping fee for that product.
+
+
+For example: 
+
+>> GET /shipping-fee?product_id=1
+
+The product_id query parameter identifies the product for which the shipping fee must be calculated
+
+Step 2: Shipping and Handling receives the request
+--------------------------------------------------
+
+The Go HTTP server receives the request on port 8080.
+The application registers the endpoint using
+
+The application registers the endpoint using:
+
+http.HandleFunc("/shipping-fee", corsMiddleware(handleShippingFee))
+The request is passed through the CORS middleware and then to the handleShippingFee function.
+
+Step 3: Application validates the product ID 
+--------------------------------------------------
+The application validates the product id 
+r.URL.Query().Get("product_id")
+
+It then converts the value into an integer.
+If the product ID is missing, the application returns HTTP 400 Bad Request.
+If the product ID is not a valid integer, it also returns HTTP 400 Bad Request.
+
+Step 4: Application Queries MongoDB
+--------------------------------------------------
+The application searches the MongoDB collection for a product with the requested ID.
+
+Your code uses the database shipping_handling and collection products.
+
+The query is:
+bson.M{"id": productID}
+The MongoDB Go Driver sends the query to MongoDB and attempts to retrieve the matching product document.
+If the product does not exist, the application returns HTTP 404 Not Found.
+If a database error occurs, the application returns HTTP 500 Internal Server Error.
+
+
+
+Step 5: Application Calculates the shipping fee
+---------------------------------------------------
+Once the product is retrieved , the application reads its category 
+it passeds the category to : 
+calculateShippingFee(product.Category)
+
+
+
+Step 6: Application sends the json response
+----------------------------------------------
+
+The application returns the product details along with  the calculated shipping fee 
+
+For example: a successfull  response for product_id 1 could look like this 
+
+{
+  "id": 1,
+  "name": "Wireless Bluetooth Headphones",
+  "description": "High-quality sound and comfortable fit",
+  "price": 59.99,
+  "category": "Electronics",
+  "shipping_fee": 10
+}
+
+
+step 7: Order management uses the shipping fee
+-------------------------------------------------
+
+When a customer proceedss to checkout , the order management microservice can requests the shipping fee from shipping and handling microservice
+
+order management  can then combine the product subtotal and shipping fee to calculate the cart total
+
+Cart Total = Product Subtotal + Shipping Fees
+
+This allows Order Management to delegate shipping calculations to the Shipping and Handling microservice rather than implementing the same calculation itself.
+
+Application flow: 
+
+START APPLICATION
+                          |
+                          v
+                    Run main.go
+                          |
+                          v
+                Read MONGO_URI
+                          |
+                          v
+              Is MONGO_URI configured?
+                    /           \
+                  YES            NO
+                   |              |
+                   v              v
+          Use configured URI   Use localhost URI
+                   |              |
+                   +-------+------+
+                           |
+                           v
+                  Connect to MongoDB
+                           |
+                           v
+               Select shipping_handling
+                           |
+                           v
+                 Select products collection
+                           |
+                           v
+               Check document count
+                           |
+                           v
+                Is collection empty?
+                    /           \
+                  YES            NO
+                   |              |
+                   v              |
+             Insert 12 sample    |
+                 products        |
+                   |              |
+                   +-------+------+
+                           |
+                           v
+                 Register API endpoints
+                           |
+                           v
+                  Start HTTP server
+                           |
+                           v
+                  Listen on port 8080
+                           |
+                           v
+                ACCEPT API REQUESTS
+
+environment variables required: 
+--------------------------------
+
+MONGO_URI   mongodb://mongodb:27017 specifies the mongodb connection URI
+
+
+Docker testing:
+
+Before deploying the application to Kubernetes, we should build its Docker image and verify that it works with MongoDB.
+
+>> docker network create ecommerce-net
+
+this create a docker network 
+
+>> docker volume create shipping-mongo-data
+
+this create a docker volume 
+
+>> docker run -d \
+  --name shipping-mongo \
+  --network ecommerce-net \
+  -v shipping-mongo-data:/data/db \
+  mongo:6.0
+
+start the mongodb container on the docker network
+
+
+>> docker build -t shipping-and-handling:v1 .
+
+build the docker image
+
+>> docker run -d \
+  --name shipping-and-handling \
+  --network ecommerce-net \
+  -p 8080:8080 \
+  -e MONGO_URI=mongodb://shipping-mongo:27017 \
+  shipping-and-handling:v1
+
+run the microservie
+
+
+>> docker ps 
+
+Check the container
+
+>> docker logs shipping-and-handling
+Your current application prints a message indicating that initial product data was inserted when the collection was empty.
+
+It also prints the server is running on port 8080
+These messages help confirm that initialization and HTTP server startup have completed 
+
+
+Testing the application : 
+----------------------------
+>> calculate the shipping feecurl -i "http://localhost:8080/shipping-fee?product_id=1"
+
+Expected result: HTTP 200 OK and a JSON response containing the product information and its shipping fee, provided MongoDB is accessible and the product exists.
+
+Test 2: Requests the shipping explanation: 
+--------------------------------------------
+>> curl -i http://localhost:8080/shipping-explanation
+
+Expected result: HTTP 200 OK and a JSON response explaining the base fee, category multiplier, and peak-hour surcharge.
+
+Test 3: Retrieve all shipping fees
+---------------------------------------
+>> curl -i http://localhost:8080/all-shipping-fees
+
+Expected result: HTTP 200 OK and a JSON array containing product information and calculated shipping fees.
+
+Test 4: Test an invalid product ID
+----------------------------------------
+>> curl -i "http://localhost:8080/shipping-fee?product_id=abc"
+
+Expected result : http 400 bad requests
+
+Test 5: Test a missing product ID
+---------------------------------------
+>> curl -i http://localhost:8080/shipping-fee
+
+Expected  result: HTTP 400 Bad requets
+
+Test 6: Test a product that does not exits
+------------------------------------------
+>> curl -i "http://localhost:8080/shipping-fee?product_id=9999"
+
+Expected result: HTTP 404 Not Found, assuming product ID 9999 is absent from the collection.
+
+
+
+MongoDB StatefulSet: mongodb-0
+          |
+          v
+MongoDB Service: mongodb:27017
+          |
+          +--------------------------+
+          |                          |
+          v                          v
+ Database: products_db      Database: shipping_handling
+          |                          |
+          v                          v
+ Product Catalog            Shipping and Handling
+
+
+
+
+

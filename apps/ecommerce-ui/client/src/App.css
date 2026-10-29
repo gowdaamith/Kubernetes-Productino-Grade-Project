@@ -1,0 +1,17 @@
+.App{min-height:100vh;display:flex;flex-direction:column}
+.App-header{background:var(--panel);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(15,23,32,0.04)}
+.brand{font-weight:700;color:var(--text);font-size:18px;letter-spacing:0.2px}
+.top-actions{display:flex;gap:12px;align-items:center}
+
+/* map user menu button to general btn styles */
+.user-pill{padding:6px 10px;border-radius:999px;background:transparent;border:1px solid rgba(15,23,32,0.06);color:var(--text);font-weight:600}
+
+.search-input{background:transparent;border:1px solid rgba(15,23,32,0.06);padding:8px 12px;border-radius:999px}
+
+.container{max-width:1100px;margin:0 auto;padding:24px}
+.card{background:var(--panel);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+
+.container{max-width:1100px;margin:0 auto;padding:24px}
+
+.card{background:var(--panel);border-radius:var(--radius);padding:16px;box-shadow:0 6px 18px rgba(20,20,20,0.04)}
+

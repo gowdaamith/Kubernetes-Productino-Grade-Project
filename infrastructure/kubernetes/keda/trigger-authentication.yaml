@@ -1,0 +1,18 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: order-worker-rabbitmq-auth
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/part-of: ecommerce-platform
+    app.kubernetes.io/name: order-worker
+spec:
+  secretTargetRef:
+    - parameter: username
+      name: order-worker-rabbitmq-auth
+      key: rabbitmq-username
+    - parameter: password
+      name: order-worker-rabbitmq-auth
+      key: rabbitmq-password
+ 
+

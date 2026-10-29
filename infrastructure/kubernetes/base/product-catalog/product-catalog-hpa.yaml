@@ -1,0 +1,39 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: 
+  name: product-catalog-hpa
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: product-catalog
+    app.kubernetes.io/part-of: ecommerce-platform
+spec: 
+  scaleTargetRef: 
+    apiVersion: apps/v1
+    kind: Deployment
+    name: product-catalog
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource: 
+        name: cpu
+        target: 
+          type: Utilization
+          averageUtilization: 70
+  behavior: 
+    scaleUp:
+      stabilizationWindowSeconds: 0
+
+      policies: 
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown: 
+      stabilizationWindowSeconds: 300
+
+      policies: 
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+
+

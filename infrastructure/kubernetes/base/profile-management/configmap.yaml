@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: profile-management-config
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: profile-management
+    app.kubernetes.io/part-of: ecommerce-platform
+
+data:
+  PORT: "3003"
+  MYSQL_HOST: "profile-mysql"
+  MYSQL_PORT: "3306"

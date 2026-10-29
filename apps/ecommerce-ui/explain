@@ -1,0 +1,13 @@
+# imagine your project uses react version 19  a third party library designed
+  for react version 18
+# the library might declare that it expects react version 18 as a peer depen
+dency
+
+
+#npm may report a dependency conflict because your project uses react 19
+# Adding --legacy-peer-deps tells npm to ignore that peer dependency conflic
+t during dependency resolution
+
+
+
+npm ci --legacy-peer-deps

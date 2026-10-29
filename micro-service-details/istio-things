@@ -1,0 +1,672 @@
+*first install the istio cli
+
+curl -sL https://istio.io/downloadIstioctl | sh -
+export PATH="$HOME/.istioctl/bin:$PATH"
+echo 'export PATH="$HOME/.istioctl/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+istioctl version --remote=false
+which istioctl
+
+Installing the istio using the default profile with envoy sidecars:
+
+This provides the foundation for:
+- Service-to-service traffic management
+- Mutual TLS (mTLS)
+- Retries and timeouts
+- Circuit breaking
+- Observability
+
+
+             Kubernetes Cluster
+                     |
+          +----------+----------+
+          |                     |
+          v                     v
+     istio-system           ecommerce
+          |                     |
+          v                     v
+       istiod              Microservices
+   (Control Plane)         (Data Plane)
+          |                     |
+          |              Envoy Sidecars
+          |                     |
+          +---------------------+
+             Configuration
+
+
+istiod is Istio's control plane. It manages proxy configuration, service discovery, and certificates for mesh workloads.
+--------------------------------------------------------------------------
+Envoy is the data-plane proxy that runs alongside an application container when sidecar injection is enabled.
+---------------------------------------------------------------------------
+
+                  User / Browser
+                        |
+                        v
+                Istio Ingress Gateway
+                   (Envoy Proxy)
+                        |
+                        v
+                Kubernetes Gateway
+                + VirtualService
+                        |
+                        v
+                Ecommerce UI Service
+                        |
+                        v
+                Ecommerce UI Pod
+               +--------------------+
+               | Ecommerce UI App   |
+               | Envoy Sidecar      |
+               +--------------------+
+                        |
+                        v
+              Backend Microservices
+               +--------------------+
+               | Application        |
+               | Envoy Sidecar      |
+               +--------------------+
+                        |
+                        v
+                    Databases
+
+
+We will install Istio's Gateway and VirtualService resources for ingress routing
+There are the istio networking resources , not the kubernetes Ingress resources  you created earlier
+
+Helm charts we'll install: 
+-------------------------
+
+helm chart                  Purpose
+
+base                  Installs istio's custom resource definatinos and 
+                      cluster level resources
+istiod                Installs the istio control plane
+gateway               Instals the istio ingress gateway
+
+
+We'll install the components in this order:
+Base → Istiod → Ingress Gateway
+
+
+We'll keep your existing NGINX Ingress running until the Istio gateway is tested successfully. Then we'll remove the NGINX Ingress resources and disable the Minikube addon.
+
+This avoids disrupting your currently working Ecommerce UI.
+
+
+Step 1: Verify whether the Helm is installed or not
+---------------------------------------------------
+
+>> helm version
+
+We'll organize the installation as follows:
+
+Namespace                Components
+
+istio-system          istio base and istiod
+istio-ingress         istio ingress gateway
+ecommerce             Existion ecommerce application and selected envoy side                      cars
+
+Keeping the gateway in a separate namespace makes it easier to manage its security, permissions, and lifecycle.
+
+Step 2: Add the official istio Helm repository
+--------------------------------------------------
+
+>> helm repo add istio https://istio-release.storage.googleapis.com/charts
+
+UPdate the repository index:
+
+>> helm repo update istio
+
+Check whether the helm can be find in the charts:
+
+>> helm search repo istio
+
+
+
+Step 3 : Install the Istio base chart
+-------------------------------------------------
+This command list all the chart in that helm repository 
+
+>> helm repo search istio 
+
+Install a particular chart
+>> helm install istio-base istio/base \
+     --namespace istio-system \
+     --create-namespace \
+     --version 1.31.1 \
+     --wait
+
+Step 4: Install the Istiod(Istio control Plane)
+--------------------------------------------------
+
+Now we'll install the istiod , the control plane of the istio service mesh , using the helm 
+
+Istiod manages the configuration of the Envoy sidecar proxies running alongside your microservices
+
+Its main reponsibilities include
+
+1.Service discovery : idnetifies services running in kubernetes
+2.Traffic Management : Distribute routing configuration to envoy proxies
+3.Security:  manages certificate and support mutual TLS
+4.Configuration management: Applies istio traffic and security policies
+
+
+
+                               Architecture
+
+
+               Kubernetes Cluster
+                       |
+                       v
+                istio-system
+                       |
+                       v
+                    Istiod
+                (Control Plane)
+                       |
+          +------------+------------+
+          |                         |
+          v                         v
+    Product Catalog           Order Management
+          |                         |
+          v                         v
+     Envoy Sidecar             Envoy Sidecar
+
+
+Important: Installing Istiod does not automatically inject Envoy sidecars into your existing application Pods. We'll configure sidecar injection separately.
+
+---------------------------------------------------------------------------
+
+
+Step 4: Installation
+
+>> helm install istiod istio/istiod \
+  --namespace istio-system \
+  --version 1.31.1 \
+  --wait \
+  --timeout 5m
+
+Verify the installation  
+
+>> helm list -n istio-system 
+
+
+Then : 
+
+>> kubectl get pods -n istio-system
+
+
+Step 5: Install the istio Ingress Gateway using Helm 
+----------------------------------------------------
+The istio Ingress gateway allow external traffic to enter your kubernetes 
+cluster routes requests to your microservices
+
+
+
+
+                User / Browser
+                      |
+                      v
+              Istio Ingress Gateway
+                      |
+                      v
+               Istio Gateway
+              (Routing Listener)
+                      |
+                      v
+               VirtualService
+               (Routing Rules)
+                      |
+                      v
+               ecommerce-ui
+               ClusterIP:80
+                      |
+                      v
+               Ecommerce UI Pod
+                  Port 4000
+
+
+We will configure the Gateway and VirtualService resources after installing the gateway controller.
+
+Step 5(a): Create a separate namespace for the istio-ingress
+--------------------------------------------------------------
+
+>> kubectl create namespace istio-ingress
+
+It separates the ingress gateway infrastructure from the Istio control plane (istio-system) and your application workloads (ecommerce)
+
+Install the istio ingress gateway
+---------------------------------
+
+helm install istio-ingressgateway istio/gateway \
+  --namespace istio-ingress \
+  --version 1.31.1 \
+  --set service.type=NodePort \
+  --wait \
+  --timeout 5m
+
+The application is currently running on minikube 
+NodePort allows us to accerss the istio ingress gateway  through the minikube's NOde  IP addresses and an assigned port
+
+Later when migrating to AWS EKS ,we can change the gateway service to loadbalancer 
+
+
+Verify the installation: 
+
+>> helm list -n istio-ingress
+
+Check the gateway POds 
+>> kubectl get pods -n istio-ingress
+
+Check the gateway Service
+>> kubectl get svc -n istio-ingress
+
+Step 6: After the installation of all these things the next thing is to 
+--------------------------------------------------------------------------
+
+After iinstalling the istio into the kubernetes cluster ,you generally create two important Yaml FILES TO control how external users access your application 
+
+1. gateway.yaml - control how the traffic enters your istio-service mesh
+2. virtualservice.yaml  - control where that traffic goes after entering
+
+Then apply the configuration: 
+
+>> kubectl apply -f gateway.yaml
+>> kubectl apply -f virtualservice.yaml
+
+verify: 
+>> kubectl get gateway -n ecommerce
+>> kubectl get virtualservice -n ecommerce
+
+
+Test the istio-ingress gateway:
+
+curl -i \
+  -H "Host: ecommerce.local" \
+  "http://$(minikube ip):30895/"
+
+after the HTTP/1.1 200 OK response from the istio
+We can delete the existing existion nginx ingress
+
+>> kubectl delete ingress ecommerce-ui -n ecommerce
+
+
+Step 7: Enable istio-sidecar injection for your ecommerce application
+----------------------------------------------------------------------
+After istio sidecar injection, the traffic can pass through envoy proxies
+
+       Ecommerce UI Pod
+    +---------------------+
+    |  Ecommerce UI       |
+    |  Container          |
+    |         |           |
+    |         v           |
+    |   Envoy Sidecar     |
+    +---------|-----------+
+              |
+              v
+        Kubernetes Network
+              |
+              v
+    +---------------------+
+    |   Envoy Sidecar     |
+    |         |           |
+    |         v           |
+    |  Product Catalog    |
+    |  Container          |
+    +---------------------+
+
+The envoy provide:
+* Traffic management: controls and observes service-to-service traffic
+* Security:    Support mTLS between participating workloads
+* Observability: Provides traffic metrics ,access logs and tracing integration
+* Resilience: Support features such as timeouts and retries when configured appropriately 
+
+Installing Istio alone does not automatically provide all these features to your application Pods. Sidecar injection is the next step.
+
+Step 7(a): Check the ecommerce UI deployment
+--------------------------------------------------------------------
+
+We'll start with only the Ecommerce UI rather than enabling injection across the entire ecommerce namespace. This avoids unintentionally restarting database Pods or injecting sidecars into every microservice at once.
+
+>> kubectl get deployment ecommerce-ui -n ecommerce
+>> kubectl get pods -n ecommerce -l app.kubernetes.io/name=ecommerce-ui
+
+Step 7(b): Enable injection for the ecommerce ui only
+---------------------------------------------------------------------
+
+check the current labels of the ecommerce ui deployment:
+
+>> kubectl get deployment ecommerce-ui -n ecommerce \
+  -o jsonpath='{.spec.template.metadata.labels}'
+echo
+
+
+Enable the sidecar injection:
+
+>> kubectl patch deployment ecommerce-ui \
+   -n ecommerce
+   --type=merge \
+   -p '{"spec":{"template":{"metadata":{"labels":{"sidecar.istio.io/inject":"true"}}}}}'
+
+What this does:
+- Updates only the Deployment's Pod template.
+- Enables automatic Istio sidecar injection for its newly created Pods.
+- Triggers a rolling update so Kubernetes replaces the existing Pods.
+- Does not enable injection for your other microservices or databases.
+
+Wait for  the rollout: 
+
+>> kubectl rollout status deployment/ecommerce-ui -n ecommerce
+
+Then inspect the pods: 
+>> kubectl get pods -n ecommerce -l app.kubernetes.io/name=ecommerce-ui
+
+Expected result: both Ecommerce UI Pods should eventually show 2/2 Running, indicating that each Pod has its application container and an istio-proxy container.
+
+If the rollout fails check this : 
+
+>> kubectl get events -n ecommerce --sort-by=.lastTimestamp | tail -25
+
+If the pod security level is too high then use Istio sidecar with CNI
+--------------------------------------------------------------------------
+Istio supports a CNI plugin that configures pod networking  without requireing  the privileged istio-init container in each application pod . this is a better fit for you security-conscious project than weakening the namespace's pod security policy 
+
+Install the CNI chart
+_--------------------
+
+>> 
+
+helm install istio-cni istio/cni \
+  --namespace kube-system \
+  --version 1.31.1 \
+  --wait \
+  --timeout 5m
+
+verify the CNI installation:
+
+>> helm list -n kube-system
+
+Check the CNI	 DaemonSet
+
+>> kubectl get daemonset -n kube-system
+
+Check its pods: 
+
+>> kubectl get pods -n kube-system | grep istio-cni
+
+Step 7 (c): Enable CNI based sidecar injection in Istiod
+-----------------------------------------------------------
+
+>> Upgrade the istiod helm release
+Run this command: 
+
+>> helm upgrade istiod istio/istiod \
+  --namespace istio-system \
+  --version 1.31.1 \
+  --set pilot.cni.enabled=true \
+  --wait \
+  --timeout 5m
+
+Step 7 (d) Verify the CNI integration and retry the sidecar injections
+------------------------------------------------------------------
+>> helm get values istiod -n istio-system
+
+Look for: 
+pilot:
+  cni:
+    enabled: true
+
+Next ,Retry the ecommerce UI rollout
+>> kubectl rollout restart deployment/ecommerce-ui -n ecommerce
+Then wait for the rollout:
+>>  kubectl rollout status deployment/ecommerce-ui -n ecommerce --timeout=180s
+
+Verify the pods 
+>> kubectl get pods -n ecommerce -l app.kubernetes.io/name=ecommerce-ui
+Expected: two Pods showing 2/2 Running.
+
+If the rollout fails again ,inspect the latest events
+>> kubectl get events -n ecommerce --sort-by=.lastTimestamp | tail -20
+
+
+Step 8: Test the application through Istio
+-------------------------------------------------
+
+>> curl -i \
+  -H "Host: ecommerce.local" \
+  "http://$(minikube ip):30895/"
+
+
+
+____________________________________________________________________________
+
+Then apply the same thing to all the services  individually 
+Even though we can apply the istio to the entire namespace  
+We follow this because our project namespace ecommerce,contains the database
+
+So Namespace-wide injection could affect database Pods when they are recreated  ,so we should account for that before enabling it 
+
+
+At last after applying the istio to all the things you architecture should look like this: 
+
+
+                 Istio Ingress Gateway
+                          |
+                          v
+                    ecommerce-ui
+                    +-----------+
+                    | UI        |
+                    | Envoy     |
+                    +-----------+
+                          |
+                          v
+                 Other Microservices
+                          |
+       +------------------+------------------+
+       |                  |                  |
+       v                  v                  v
+ Product Catalog    Product Inventory   Order Management
+   + Envoy              + Envoy             + Envoy
+       |                  |                  |
+       +------------------+------------------+
+                          |
+                Other Application Services
+                          |
+          +---------------+----------------+
+          |               |                |
+          v               v                v
+      Profile         Shipping           Contact
+    Management       & Handling          Support
+      + Envoy           + Envoy            + Envoy
+
+                Database Workloads
+           (Istio sidecars not enabled)
+          +-------------+-------------+
+          |             |             |
+       MongoDB       PostgreSQL      MySQL
+
+___________________________________________________________________________
+
+Next check wheather the application still works through the istio ingress gateway after infecting the sidecars
+
+>> curl -i -H "Host: ecommerce.local" "http://$(minikube ip):30895/"
+
+Expected Output: 
+HTTP/1.1 200 OK
+x-powered-by: Express
+accept-ranges: bytes
+cache-control: public, max-age=0
+last-modified: Sat, 24 Oct 2026 20:40:00 GMT
+etag: W/"284-1a16fa44900"
+content-type: text/html; charset=UTF-8
+content-length: 644
+date: Mon, 26 Oct 2026 14:57:30 GMT
+x-envoy-upstream-service-time: 9
+server: istio-envoy
+
+Next check wheather the Ecommerce_UI is able to talk with the Product catalog service 
+
+This hels us to check communication between two applicaation that both have istio sidecars
+
+>> kubectl exec -n ecommerce deployment/ecommerce-ui \
+  -c ecommerce-ui -- \
+  node -e '
+const http = require("http");
+
+http.get("http://product-catalog:3001/api/products", (res) => {
+  console.log("HTTP Status:", res.statusCode);
+  console.log("Response Headers:", res.headers);
+
+  let data = "";
+
+  res.on("data", chunk => data += chunk);
+
+  res.on("end", () => {
+    const products = JSON.parse(data);
+    console.log("Total Products:", products.length);
+  });
+
+}).on("error", (err) => {
+  console.error("Request failed:", err.message);
+  process.exitCode = 1;
+});
+'
+
+
+This helps us the understand and check?
+
+* Whether kubernetes DNS resolves product-catalog
+* Whether the request reaches the product catalog service
+* Whether the backend returns an HTTP response
+* Whether application-to-application networking continues to work after enabling istio sidecars
+
+___________________________________________________________________________
+
+Next Verify : Istio Mutual TLS(mTLS)
+------------------------------------
+
+1.What is this Istio mutual TLS
+
+Mutual TLS (mTLS) provides encrypted and authenticated communication between services
+
+Without mTLS:
+----------------
+Ecommerce UI
+     |
+     | Plain HTTP
+     |
+     v
+Product Catalog
+
+With istio mTLS:
+----------------
+
+Ecommerce UI Pod                    Product Catalog Pod
++------------------+                +------------------+
+| Ecommerce UI     |                | Product Catalog  |
+|                  |                |                  |
+| Istio Envoy      |<==============>| Istio Envoy      |
++------------------+  Encrypted     +------------------+
+                        mTLS
+
+
+Both Envoy proxies authenticate each other using certificates managed through Istio
+
+
+Is mTLS  already enabled?
+Istio generally uses PERMISSIVE mTLS mode by default unless you configure a different policy.
+In PERMISSIVE mode, a destination sidecar accepts both plaintext and mTLS connections.
+
+Because both your application Deployments have sidecars, Istio's automatic mTLS functionality should normally establish mTLS between them.
+
+
+Verify mTLS using envoy metrics:
+
+
+Step 1: Generate a request
+
+kubectl exec -n ecommerce deployment/ecommerce-ui \
+  -c ecommerce-ui -- \
+  node -e '
+require("http").get(
+  "http://product-catalog:3001/api/products",
+  res => {
+    console.log("HTTP Status:", res.statusCode);
+    res.resume();
+  }
+).on("error", console.error);
+'
+
+
+expected: HTTP Status: 200
+
+Step 2: Check the product catalog's istio metrics
+
+kubectl exec -n ecommerce deployment/product-catalog \
+  -c istio-proxy -- \
+  pilot-agent request GET stats/prometheus \
+  | grep 'istio_requests_total' \
+  | grep 'source_workload="ecommerce-ui"' \
+  | grep 'connection_security_policy="mutual_tls"'
+
+
+Here we are checking for these labels:
+-------------------------------------
+
+ Label                                      Meaning 
+
+source_workload="ecommerce-ui            The request originated from Ecommerce UI.
+destination_workload="product-catalog    The request reached Product Catalog. 
+connection_security_policy="mutual_tls"  Istio identified the connection as using mutual TLS
+
+
+
+Ecommerce UI application
+          |
+          | HTTP request
+          v
+Ecommerce UI Envoy proxy
+          |
+          | Authenticated, encrypted mTLS connection
+          v
+Product Catalog Envoy proxy
+          |
+          | HTTP request
+          v
+Product Catalog application
+
+
+Your Node.js application does not need to implement TLS itself for this service-to-service connection. The Envoy proxies handle the mTLS connection between them.
+
+
+Step 3: Next step: Enforce strict mTLS for application workloads
+----------------------------------------------------------------
+
+So far, we have verified mTLS, but we have not explicitly enforced it using a PeerAuthentication policy.
+
+Istio's default permissive behavior allows both plaintext and mTLS traffic. To strengthen security, we can create a PeerAuthentication policy with mode: STRICT.
+
+This tells the selected workloads to accept only connections authenticated with Istio mTLS.
+
+applying strict mTLS only to the seven application microservices, keeping MongoDB, PostgreSQL, and MySQL outside the policy for now.
+
+Before creating that policy, we should verify that every application-to-application connection works correctly, especially Order Management, Shipping and Handling, Profile Management, and Product Inventory.
+
+Step 3(a): Check the current istio security Policy
+---------------------------------------------------
+
+This checks whether any Peerauthentication  policies already exits
+>> kubectl get peerauthenticcation -A
+
+Then check the existing policies in your application namespace
+>> kubectl get peerauthentication -n ecommerce -o yaml
+
+Istio uses a peer authentication resource to control how workloads accept incoming connection
+
+ Mode                        Behavior 
+
+ `PERMISSIVE           Accepts plaintext and mTLS connections. 
+ `STRICT`              Accepts only connections using mTLS. 
+ `DISABLE`             Disables Istio mTLS for the selected workload. 
+

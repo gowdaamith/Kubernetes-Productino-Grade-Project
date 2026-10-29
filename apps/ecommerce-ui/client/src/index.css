@@ -1,0 +1,46 @@
+
+:root{
+  /* Minimal modern neutral theme */
+  --bg: #f5f7f8; /* very light neutral */
+  --panel: #ffffff; /* card background */
+  --muted: #6b7280; /* muted text */
+  --text: #0f1720; /* primary text */
+  --accent: #6b7280; /* subtle slate accent */
+  --accent-2: #f3f4f6; /* subtle panel tint */
+  --radius: 12px; /* soft corners */
+  --gap: 16px;
+  --shadow: 0 8px 24px rgba(15,23,32,0.06);
+}
+
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.45;
+}
+
+code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace}
+
+
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* subtle form controls */
+input,textarea,select{border:1px solid rgba(15,23,32,0.06);padding:10px;border-radius:12px;background:transparent}
+
+/* Unified button styles */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:999px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;transition:transform .08s ease,opacity .12s ease}
+.btn.secondary{background:transparent;color:var(--text);border:1px solid rgba(15,23,32,0.06)}
+.btn.ghost{background:transparent;color:var(--muted);border:1px dashed rgba(15,23,32,0.04)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* make native buttons consistent with .btn */
+button{font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600}
+button.secondary{background:transparent;color:var(--text);border:1px solid rgba(15,23,32,0.06)}
+

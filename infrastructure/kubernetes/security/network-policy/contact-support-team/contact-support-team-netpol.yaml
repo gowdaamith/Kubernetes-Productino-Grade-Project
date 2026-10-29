@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: 
+  name: contact-support-team
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: contact-support-team
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  podSelector: 
+    matchLabels: 
+      app.kubernetes.io/name: contact-support-team
+  policyTypes:
+    - Ingress
+    - Egress 
+  ingress:
+    - from: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/part-of: ecommerce-platform
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to: 
+        - podSelector: 
+            matchLabels: 
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    - to: 
+        - namespaceSelector: 
+            matchLabels: 
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+

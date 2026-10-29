@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata: 
+  name: profile-mysql
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: profile-mysql
+    app.kubernetes.io/part-of: ecommerce-platform
+spec: 
+  type: ClusterIP
+  selector: 
+    app.kubernetes.io/name: profile-mysql
+  ports: 
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+      protocol: TCP
+

@@ -1,0 +1,12 @@
+CMD  specifies the default container startup command
+gunicorn   start the production WSGI server
+--bind 0.0.0.0:8000  listens on port 8000 on all container IPV4 interfaces
+--worker 2           starts two worker  processes
+--timeout 30         configures the workeer timeout to 30 seconds after this                     fi the worker doesn't responds the worker will  be 
+                     restarted
+--error-logfile -    send error logs to standard error
+--access-logfile -   send access logs logs to standard output
+server               Loads the WSGI application from server.py expection an                      object named app
+
+
+

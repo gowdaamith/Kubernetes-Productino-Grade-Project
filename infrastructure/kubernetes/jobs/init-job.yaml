@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: shipping-and-handling-init
+  namespace: ecommerce
+
+  labels:
+    app.kubernetes.io/name: shipping-and-handling
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 86400
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-and-handling-init
+        app.kubernetes.io/part-of: ecommerce-platform
+
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10005
+        runAsGroup: 10005
+
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: shipping-and-handling-init
+          image: shipping-and-handling:v2
+          imagePullPolicy: IfNotPresent
+
+          envFrom:
+            - configMapRef:
+                name: shipping-and-handling-config
+
+          env:
+            - name: INITIALIZE_SAMPLE_DATA
+              value: "true"
+
+            - name: INIT_ONLY
+              value: "true"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+
+            limits:
+              cpu: 250m
+              memory: 128Mi

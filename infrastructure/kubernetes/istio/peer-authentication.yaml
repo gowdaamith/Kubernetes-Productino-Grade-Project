@@ -1,0 +1,97 @@
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: ecommerce-ui-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ecommerce-ui
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: contact-support-team-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: contact-support-team
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: order-management-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: order-management
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: product-catalog-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: product-catalog
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: product-inventory-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: product-inventory
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: profile-management-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: profile-management
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: shipping-and-handling-strict-mtls
+  namespace: ecommerce
+  labels:
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-and-handling
+  mtls:
+    mode: STRICT

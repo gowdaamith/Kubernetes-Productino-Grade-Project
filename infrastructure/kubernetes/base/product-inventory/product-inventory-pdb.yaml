@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: 
+  name: product-inventory
+  namespace: ecommerce
+  labels: 
+    app.kubernetes.io/name: product-inventory
+    app.kubernetes.io/part-of: ecommerce-platform
+spec:
+  minAvailable: 1
+  selector: 
+    matchLabels: 
+      app.kubernetes.io/name: product-inventory
+
+
