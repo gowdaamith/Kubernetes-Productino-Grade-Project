@@ -10,7 +10,7 @@ spec:
   scaleTargetRef: 
     name: order-worker
   pollingInterval: 15
-  cooldownPeriod: 60
+  cooldownPeriod: 3000
   minReplicaCount: 0
   maxReplicaCount: 5
   triggers:

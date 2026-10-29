@@ -43,7 +43,7 @@ spec:
       containers:
         - name: order-management
 
-          image: order-management:v3
+          image: order-management:v4
           imagePullPolicy: IfNotPresent
 
           ports:
