@@ -1,0 +1,180 @@
+# ==========================================================
+# Kube Prometheus Stack
+# Helm chart version: 92.16.0
+# Namespace: monitoring
+# ==========================================================
+
+# ----------------------------------------------------------
+# Prometheus Operator
+# ----------------------------------------------------------
+
+prometheusOperator:
+  enabled: true
+
+
+# ----------------------------------------------------------
+# Prometheus
+# ----------------------------------------------------------
+
+prometheus:
+  enabled: true
+
+  prometheusSpec:
+
+    replicas: 1
+
+    retention: 15d
+
+    scrapeInterval: 15s
+
+    evaluationInterval: 30s
+
+    # Discover ServiceMonitors across namespaces.
+    serviceMonitorNamespaceSelector: {}
+
+    serviceMonitorSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+    # Discover PodMonitors across namespaces.
+    podMonitorNamespaceSelector: {}
+
+    podMonitorSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+
+    # Discover PrometheusRules across namespaces.
+    ruleNamespaceSelector: {}
+
+    ruleSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+
+
+# ----------------------------------------------------------
+# Grafana
+# ----------------------------------------------------------
+
+grafana:
+  enabled: true
+
+  defaultDashboardsEnabled: true
+
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: standard
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+    datasources:
+      enabled: true
+
+
+# ----------------------------------------------------------
+# Alertmanager
+# ----------------------------------------------------------
+
+alertmanager:
+  enabled: true
+
+  alertmanagerSpec:
+
+    replicas: 1
+
+    retention: 120h
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+
+
+# ----------------------------------------------------------
+# Kubernetes Monitoring
+# ----------------------------------------------------------
+
+kubeApiServer:
+  enabled: true
+
+kubelet:
+  enabled: true
+
+kubeControllerManager:
+  enabled: true
+
+kubeScheduler:
+  enabled: true
+
+kubeProxy:
+  enabled: true
+
+kubeEtcd:
+  enabled: true
+
+coreDns:
+  enabled: true
+
+
+# ----------------------------------------------------------
+# Kubernetes State Metrics
+# ----------------------------------------------------------
+
+kubeStateMetrics:
+  enabled: true
+
+
+# ----------------------------------------------------------
+# Node Exporter
+# ----------------------------------------------------------
+
+nodeExporter:
+  enabled: true
+
+
+# ----------------------------------------------------------
+# Kubernetes Monitoring Rules
+# ----------------------------------------------------------
+
+defaultRules:
+  create: true

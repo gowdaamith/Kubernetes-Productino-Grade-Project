@@ -1,0 +1,65 @@
+Add the Helm repository: 
+------------------------
+>> helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+>> helm repo udpate
+
+Look the helm repo for the charts
+-----------------------------------------
+>> helm search repo prometheus-community
+
+Find the available chart version: 
+-----------------------------------------
+>> helm search repo prometheus-community/kube-prometheus-stack
+
+Create the monitoring namespace
+-----------------------------------------
+>> kubectl create namespace monitoring
+
+Check the chart configuration before installation
+---------------------------------------------------
+>> helm show values prometheus-community/kube-prometheus-stack > /tmp/kube-prometheus-default-values.yaml
+
+
+And create a custom configuration file to provide our value
+-----------------------------------------------------------
+
+>> touch values.yaml
+
+Here we will configure the following things: 
+
+Prometheus Operator: Enabled
+Prometheus         : Enabled , persistent storage ,15-day retention
+Grafana            : Enabled , persistent storage, dashboard provisioning
+AlertManager       : Enabled , persistent storage
+Node Exporter      : Enabled
+Kube-state-metrics : Enabled
+ServiceMonitor discovery : Enabled for monitoring additional namespace
+Istio metrics            : Integrated after the initial stack is healthy
+
+
+Next Check your Storage Class: 
+--------------------------------
+
+>> kubectl get storageclass
+
+Check the monitoring namespace:
+--------------------------------
+>> kubectl get namespace monitoring
+
+
+
+Install the monitoring Stack : 
+
+>> 
+
+helm upgrade --install prometheus-stack \
+  prometheus-community/kube-prometheus-stack \
+  --version 92.16.0 \
+  --namespace monitoring \
+  --create-namespace \
+  -f values.yaml \
+  --wait \
+  --timeout 10m
+
+
