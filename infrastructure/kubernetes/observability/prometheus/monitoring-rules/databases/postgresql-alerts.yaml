@@ -1,0 +1,164 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: postgresql-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+    # 1. PostgreSQL availability
+    - name: ecommerce.postgresql.availability
+      rules:
+        - alert: PostgreSQLPodNotReady
+          expr: |
+            kube_pod_status_ready{
+              namespace="ecommerce",
+              pod="inventory-postgres-0",
+              condition="true"
+            } == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL pod is not ready"
+            description: "PostgreSQL pod inventory-postgres-0 has been NotReady for more than 5 minutes."
+
+    # 2. PostgreSQL restarts
+    - name: ecommerce.postgresql.restarts
+      rules:
+        - alert: PostgreSQLFrequentRestarts
+          expr: |
+            sum by (namespace, pod) (
+              increase(
+                kube_pod_container_status_restarts_total{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0"
+                }[15m]
+              )
+            ) > 2
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL container is restarting frequently"
+            description: "PostgreSQL pod inventory-postgres-0 has experienced more than 2 container restarts within 15 minutes."
+
+    # 3. PostgreSQL memory
+    - name: ecommerce.postgresql.memory
+      rules:
+        - alert: PostgreSQLHighMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL memory usage is high"
+            description: "PostgreSQL pod inventory-postgres-0 is using more than 80% of its memory limit for 5 minutes."
+
+        - alert: PostgreSQLCriticalMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL memory usage is critical"
+            description: "PostgreSQL pod inventory-postgres-0 is using more than 90% of its memory limit for 2 minutes."
+
+    # 4. PostgreSQL CPU
+    - name: ecommerce.postgresql.cpu
+      rules:
+        - alert: PostgreSQLHighCPUUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                rate(container_cpu_usage_seconds_total{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0"
+                }[5m])
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0",
+                  resource="cpu",
+                  unit="core"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL CPU usage is high"
+            description: "PostgreSQL pod inventory-postgres-0 is using more than 80% of its CPU limit for 5 minutes."
+
+        - alert: PostgreSQLCriticalCPUUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                rate(container_cpu_usage_seconds_total{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0"
+                }[5m])
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="inventory-postgres-0",
+                  resource="cpu",
+                  unit="core"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL CPU usage is critical"
+            description: "PostgreSQL pod inventory-postgres-0 is using more than 90% of its CPU limit for 2 minutes."
+

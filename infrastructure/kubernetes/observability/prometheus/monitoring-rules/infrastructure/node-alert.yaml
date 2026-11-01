@@ -1,0 +1,120 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: ecommerce-node-alerts
+  namespace: monitoring
+
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+
+    # Monitor Kubernetes node readiness
+    - name: ecommerce.node.availability
+      rules:
+
+        - alert: KubernetesNodeNotReady
+          expr: |
+            kube_node_status_condition{
+              condition="Ready",
+              status="true"
+            } == 0
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Kubernetes node is not ready"
+            description: "Node {{ $labels.node }} has not been Ready for more than 5 minutes."
+
+    # Monitor node CPU utilization
+    - name: ecommerce.node.cpu
+      rules:
+
+        - alert: KubernetesNodeHighCPU
+          expr: |
+            (
+              1 -
+              avg by (instance) (
+                rate(node_cpu_seconds_total{mode="idle"}[5m])
+              )
+            ) * 100 > 80
+          for: 5m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "Kubernetes node CPU usage is high"
+            description: "Node {{ $labels.instance }} CPU utilization has exceeded 80% for 5 minutes."
+
+    # Monitor node memory utilization
+    - name: ecommerce.node.memory
+      rules:
+
+        - alert: KubernetesNodeHighMemory
+          expr: |
+            (
+              1 -
+              (
+                node_memory_MemAvailable_bytes
+                /
+                node_memory_MemTotal_bytes
+              )
+            ) * 100 > 85
+          for: 5m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "Kubernetes node memory usage is high"
+            description: "Node {{ $labels.instance }} memory utilization has exceeded 85% for 5 minutes."
+
+        - alert: KubernetesNodeLowMemory
+          expr: |
+            (
+              node_memory_MemAvailable_bytes
+              /
+              node_memory_MemTotal_bytes
+            ) * 100 < 10
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Kubernetes node has very low available memory"
+            description: "Node {{ $labels.instance }} has less than 10% available memory for 5 minutes."
+
+    # Monitor node filesystem availability
+    - name: ecommerce.node.disk
+      rules:
+
+        - alert: KubernetesNodeDiskSpaceLow
+          expr: |
+            (
+              node_filesystem_avail_bytes{
+                mountpoint="/data",
+                fstype="ext4"
+              }
+              /
+              node_filesystem_size_bytes{
+                mountpoint="/data",
+                fstype="ext4"
+              }
+            ) * 100 < 10
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Kubernetes node disk space is low"
+            description: "Node {{ $labels.instance }} filesystem {{ $labels.mountpoint }} has less than 10% available disk space for 5 minutes."
+

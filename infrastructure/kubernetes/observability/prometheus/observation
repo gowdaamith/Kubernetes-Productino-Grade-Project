@@ -1,0 +1,18 @@
+The PostgresSQL is working normally 
+
+but after an observation through prometheus by using promql queries 
+>> we observed that the postgresql was experiencing  the CPU throtelling 
+
+
+But when we check the current cpu usage the postgres the usage was less
+So we came to a conclusion that the Postgres was having a CPU bursts 
+
+Later we also checked whether the Postgres was restarting due to this cpu throllling and was facing 
+any other problem 
+
+so we check the restart number using promql querry it showed 16
+So we check the logs of the pod  to see why it was restarted 
+ther we saw that the pod has restarted mainly due to our manual stop not due to cpu throtelling 
+and other problem 
+
+

@@ -1,0 +1,101 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: ecommerce-container-resource-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+    - name: ecommerce.container.cpu
+      rules:
+        - alert: EcommerceHighCPUThrottling
+          expr: |
+            (
+              sum by (namespace, pod) (
+                rate(container_cpu_cfs_throttled_periods_total{
+                  namespace="ecommerce"
+                }[5m])
+              )
+              /
+              sum by (namespace, pod) (
+                rate(container_cpu_cfs_periods_total{
+                  namespace="ecommerce"
+                }[5m])
+              )
+            ) * 100 > 20
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ecommerce pod has high CPU throttling"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has experienced CPU throttling in more than 20% of scheduling periods for 5 minutes."
+
+    - name: ecommerce.container.memory
+      rules:
+        - alert: EcommerceHighMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  id!=""
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ecommerce pod has high memory usage"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 80% of its configured memory limit for 5 minutes."
+
+        - alert: EcommerceCriticalMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  id!=""
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ecommerce pod is approaching its memory limit"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 90% of its configured memory limit for 2 minutes."
+
+        - alert: EcommerceContainerOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{
+              namespace="ecommerce",
+              reason="OOMKilled"
+            } == 1
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ecommerce container was OOMKilled"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was terminated due to an out-of-memory condition."  

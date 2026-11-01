@@ -1,0 +1,164 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: mysql-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+    # 1. MySQL availability
+    - name: ecommerce.mysql.availability
+      rules:
+        - alert: MySQLPodNotReady
+          expr: |
+            kube_pod_status_ready{
+              namespace="ecommerce",
+              pod="profile-mysql-0",
+              condition="true"
+            } == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MySQL pod is not ready"
+            description: "MySQL pod profile-mysql-0 has been NotReady for more than 5 minutes."
+
+    # 2. MySQL restarts
+    - name: ecommerce.mysql.restarts
+      rules:
+        - alert: MySQLFrequentRestarts
+          expr: |
+            sum by (namespace, pod) (
+              increase(
+                kube_pod_container_status_restarts_total{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0"
+                }[15m]
+              )
+            ) > 2
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MySQL container is restarting frequently"
+            description: "MySQL pod profile-mysql-0 has experienced more than 2 container restarts within 15 minutes."
+
+    # 3. MySQL memory
+    - name: ecommerce.mysql.memory
+      rules:
+        - alert: MySQLHighMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "MySQL memory usage is high"
+            description: "MySQL pod profile-mysql-0 is using more than 80% of its memory limit for 5 minutes."
+
+        - alert: MySQLCriticalMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MySQL memory usage is critical"
+            description: "MySQL pod profile-mysql-0 is using more than 90% of its memory limit for 2 minutes."
+
+    # 4. MySQL CPU
+    - name: ecommerce.mysql.cpu
+      rules:
+        - alert: MySQLHighCPUUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                rate(container_cpu_usage_seconds_total{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0"
+                }[5m])
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0",
+                  resource="cpu",
+                  unit="core"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "MySQL CPU usage is high"
+            description: "MySQL pod profile-mysql-0 is using more than 80% of its CPU limit for 5 minutes."
+
+        - alert: MySQLCriticalCPUUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                rate(container_cpu_usage_seconds_total{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0"
+                }[5m])
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="profile-mysql-0",
+                  resource="cpu",
+                  unit="core"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MySQL CPU usage is critical"
+            description: "MySQL pod profile-mysql-0 is using more than 90% of its CPU limit for 2 minutes."
+

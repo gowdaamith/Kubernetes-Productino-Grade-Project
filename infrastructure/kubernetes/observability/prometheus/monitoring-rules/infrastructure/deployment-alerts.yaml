@@ -1,0 +1,65 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: ecommerce-deployment-alerts
+  namespace: monitoring
+
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+
+    # Monitor deployment replica availability
+    - name: ecommerce.deployment.availability
+      rules:
+
+        - alert: EcommerceDeploymentReplicasUnavailable
+          expr: |
+            (
+              kube_deployment_spec_replicas{
+                namespace="ecommerce"
+              } > 0
+            )
+            and on(namespace, deployment)
+            (
+              kube_deployment_status_replicas_available{
+                namespace="ecommerce"
+              }
+              <
+              kube_deployment_spec_replicas{
+                namespace="ecommerce"
+              }
+            )
+          for: 5m
+
+          labels:
+            severity: warning
+
+          annotations:
+            summary: "Ecommerce deployment has unavailable replicas"
+            description: "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} has fewer available replicas than requested for more than 5 minutes."
+
+    # Monitor deployments that stop progressing
+    - name: ecommerce.deployment.rollout
+      rules:
+
+        - alert: EcommerceDeploymentRolloutStuck
+          expr: |
+            kube_deployment_status_condition{
+              namespace="ecommerce",
+              condition="Progressing",
+              status="false"
+            } == 1
+          for: 5m
+
+          labels:
+            severity: critical
+
+          annotations:
+            summary: "Ecommerce deployment rollout is stuck"
+            description: "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} is reporting that its rollout is not progressing."
+

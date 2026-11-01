@@ -1,0 +1,103 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: mongodb-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  groups:
+    - name: ecommerce.mongodb.availability
+      rules:
+        - alert: MongoDBPodNotReady
+          expr: |
+            kube_pod_status_ready{
+              namespace="ecommerce",
+              pod="mongodb-0",
+              condition="true"
+            } == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MongoDB pod is not ready"
+            description: "MongoDB pod mongodb-0 in namespace ecommerce has been NotReady for more than 5 minutes."
+
+
+    - name: ecommerce.mongodb.restarts
+      rules:
+        - alert: MongoDBFrequentRestarts
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="ecommerce",
+                pod="mongodb-0",
+                container="mongodb"
+              }[15m]
+            ) > 2
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MongoDB container is restarting frequently"
+            description: "MongoDB container in pod mongodb-0 has restarted more than 2 times within the last 15 minutes."
+
+    
+    - name: ecommerce.mongodb.memory
+      rules:
+        - alert: MongoDBHighMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="mongodb-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="mongodb-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "MongoDB memory usage is high"
+            description: "MongoDB pod mongodb-0 is using more than 80% of its memory limit for 5 minutes."
+
+        - alert: MongoDBCriticalMemoryUsage
+          expr: |
+            (
+              sum by (namespace, pod) (
+                container_memory_working_set_bytes{
+                  namespace="ecommerce",
+                  pod="mongodb-0"
+                }
+              )
+              /
+              on (namespace, pod)
+              sum by (namespace, pod) (
+                kube_pod_container_resource_limits{
+                  namespace="ecommerce",
+                  pod="mongodb-0",
+                  resource="memory",
+                  unit="byte"
+                }
+              )
+            ) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MongoDB memory usage is critical"
+            description: "MongoDB pod mongodb-0 is using more than 90% of its memory limit for 2 minutes." 
