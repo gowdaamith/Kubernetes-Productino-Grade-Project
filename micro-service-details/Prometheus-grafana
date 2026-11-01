@@ -62,4 +62,444 @@ helm upgrade --install prometheus-stack \
   --wait \
   --timeout 10m
 
+Check wheather the resources are installed or not:
+>> kubectl get pod -n monitoring
 
+AFTER 
+
+Step 1: Check the Prometheus targets : 
+
+>>
+ kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-prometheus 9090:9090
+
+
+Prometheus Targets:
+------------------
+Check whether  the targets have an UP status, particularly the kubernets , node-exporter , and kube-state-metrics targets
+
+Step 2: Open Grafana:
+
+>> 
+kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
+
+
+Retrive the Grafana username and password
+
+>> Username
+kubectl get secret -n monitoring prometheus-stack-grafana \
+  -o jsonpath='{.data.admin-user}' | base64 -d
+echo
+
+>> password
+
+kubectl get secret -n monitoring prometheus-stack-grafana \
+  -o jsonpath='{.data.admin-password}' | base64 -d
+echo
+
+
+___________________________________________________________________________
+
+Prometheus:
+
+Before creating dashboards or alerts , we should understand what prometheus currently collects 
+
+SStep 1: Verify the prometheus is running: 
+
+>> kubectl get pods -n monitoring
+>> kubectl get svc -n monitoring
+
+Step 2: Explore the Prometheus metrics 
+Open the Grapth or Query interface and try   these queries individually
+
+
+Check whether prometheus is collecting metrics 
+>>
+up
+
+
+1 > means the latest scrape  succeded
+0 > means the latest scrape failed
+
+
+Check the CPU usage by container:
+>> 
+rate(container_cpu_usage_seconds_total[5m])
+
+This estimates the CPU cores consumed by each container over the last five minutes. The result may include series without useful container labels, depending on the available metrics.
+
+
+Check the memory usage by the container:
+>> 
+container_memory_working_set_bytes
+
+check the kubernetes pod information:
+>> 
+kube_pod_info
+
+===========================================================================
+
+Grafana:
+
+Step 1: Log in to the Grafana
+--------------------------------
+
+Once Logged in: 
+1.Open Connections -> Data source
+2.Select Prometheus
+3.Check the Configured Prometheus URL
+4.Click Save and test if available
+
+Your Grafana installation from kube-prometheus-stack will normally have a Prometheus data source configured automatically.
+
+If the data source3 already works do not create a duplicate
+
+Step 2: Import a kubernetes dashboard
+---------------------------------------
+Let's start with an existing dashboard instead of building every panel manually 
+
+1.Open Dashboard
+2.Select new -> Import
+3.Enter dashboard ID 15757
+4.Click Load
+5.Select your existing Prometheus data source
+6.Click Import
+
+Dashboard ID 15757 is a community dashboard commonly associated with Kubernetes monitoring. Dashboard contents and compatibility can change, so if it does not load correctly, we'll choose a dashboard compatible with your installed metrics.
+
+Step 3: Verify the dashboard
+---------------------------------------
+After importing, check whether you can see:
+- CPU usage
+- Memory usage
+- Pod or workload information
+- Kubernetes resource metrics
+Some panels may show no data if their required metrics or labels are unavailable. We can troubleshoot those individually.
+
+============================================================================
+Alert Manager
+-----------------
+
+If your product-catalog deplloyment has no available replicas ,prometheus can detect the problem and fire an alert .Alert manager receives that alert and routes a notification your configured receiver
+
+Step 1: Verify the Alert Manager
+-----------------------------------
+>> kubectl get pods -n monitoring | grep alertmanager
+>> kubectl get svc -n monitoring | grep alertmanager
+
+Open AlertManger UI
+___________________
+
+>> kubectl port-forward -n monitoring svc/prometheus-stack-prom-alertmanager
+9093:9093
+
+
+
+Step 2: Configure the Alert manager
+------------------------------------
+Understand teh alert manager interface
+
+
+Explore these sections:
+- Alerts: Currently firing alerts.
+- Silences: Temporarily suppress selected alerts.
+- Status: Alertmanager configuration and runtime information.
+
+
+We will here configure the AlertManager with the Slack so When every there is a alert the slack will get notified by the AlertManager
+
+
+The approach will be:
+1.Create a Slack Incoming webhook
+2.Store the Webhook URL in kubernetes secret
+3.Configure teh alertmanager to use that secret
+4.Update the helm release while preserving your existiong values
+
+
+Step 1: Create a Slack Incoming Webhook
+
+1.Search for the Slack API in the Browser and click on the Slack API page 
+2.Click on the Create new app
+3.Inside this click on the Blank app
+4.Give app a name and connect with the workspace you have created in the slack 
+Here for example : Kubernetes Alertmanger
+5.Continues continues and create
+6.Search for the Incomming Webhooks
+7.Activate the Incoming Webhooks  by turning it on which was earlier off
+8.next click on the add webhook 
+   which will take us to the new page wher you select to which channel it has to send the message 
+   here it is: all-kubernetes-alertmanager
+9. And allow 
+10.Copy the created webhook and save it
+
+
+
+Next we will connect the Slack webhook to the AlertManager Using a Kubernetes Secret:
+----------------------------------------------------------------------------
+
+Create a Secret file in the appropriate directory
+
+>> vim slack-webhook-secret.yaml
+
+apiVersion: v1
+kind: Secret
+
+metadata:
+  name: slack-webhook
+  namespace: monitoring
+
+type: Opaque
+
+stringData:
+  slack_api_url: "PASTE_YOUR_SLACK_WEBHOOK_URL_HERE"
+
+Apply this file: 
+>> kubectl apply -f slack-webhook-secret.yaml
+
+Ok next we'll configure the existing kube-prometheus-stack helm release to ues your Slack secret
+
+We'll make two change: 
+1.Mount Slack-WebHook into AlertManager
+2.Configure Alertmanager to send notificatoin to your slack channel
+
+
+
+Back Up your Current Helm values:
+----------------------------------
+
+Run: 
+helm get values prometheus-stack -n monitoring -o yaml \
+  > prometheus-stack-values.yaml
+
+This create a local copy of your current custom helm configuration
+
+
+alertManager:
+  # Alertmanager main configuration 
+  # Defines how alerts are grouped and routed and delivered
+
+  config: 
+    # Global settings applid to alll alert notifications
+    global: 
+      # wait up to 5 minutes befoer considering an alert resolved
+      resolved_timeout: 5m
+      
+    # Defines where the alert to be sent
+    route: 
+      # send alerts to this receiver by default
+      receiver: slack-notification
+      
+      # Group alerts sharing the same alert name and namespace
+      # Example: Mulitple PodDown alerts in ecommerce
+      # can  be combined into one notificatiions
+      
+      group_by: 
+        - alertname
+        - namespace
+
+      # Wait 30 seconds after the first alert before sending
+      # the initial notification. This allows related alerts
+      # to arrive and be grouped together.
+   
+      group_wait: 30s
+      
+      # Wait 5 minutes before sending notifications for
+      # newly added alerts in an existing group.
+      group_interval: 5m
+
+      # Send repeat notifications every 4 hours
+      # if an alert remains firing.
+      repeat_interval: 4h
+  
+    # Defines the notification receivers.
+    # A receiver is the destination where alerts are delivered.
+    receivers:
+      - name: slack-notifications
+
+        # Slack notification integration.
+        slack_configs:
+
+          # Read the Slack webhook URL from a mounted Secret file.
+          # This avoids hardcoding the sensitive webhook URL.
+          - api_url_file: /etc/alertmanager/secrets/slack-webhook/slack_api_url
+
+            # Slack channel where notifications will be delivered.
+            channel: "#kubernetes-alerts"
+
+            # Send a notification when an alert is resolved.
+            # This means you receive both firing and resolved alerts.
+            send_resolved: true
+
+            # Template used for the Slack notification title.
+            title: '{{ template "slack.default.title" . }}'
+
+            # Template used for the Slack notification message.
+            text: '{{ template "slack.default.text" . }}'
+      - name: "null"
+
+    alertmanagerSpec:
+
+    # Mount the existing Kubernetes Secret into Alertmanager.
+    # The Secret must exist in the monitoring namespace.
+    secrets:
+      - slack-webhook
+
+    # Run one Alertmanager replica.
+    replicas: 1
+
+    # CPU and memory limits and requests for Alertmanager.
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+    # Retain Alertmanager notification data for 120 hours (5 days).
+    retention: 120h
+
+    # Persistent storage configuration for Alertmanager.
+    storage:
+      volumeClaimTemplate:
+        spec:
+          # Allow one node to mount this volume for read/write.
+          accessModes:
+            - ReadWriteOnce
+
+          resources:
+            requests:
+              # Request a 5 GiB PersistentVolume.
+              storage: 5Gi
+
+          # Use Minikube's standard StorageClass.
+          storageClassName: standard
+
+  # Enable Alertmanager installation.
+  enabled: true
+
+
+
+Next after editing the values.yaml Upgrade the HelM :
+
+helm upgrade prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --version 92.16.0 \
+  -f prometheus-stack-values.yaml
+
+Check the AlertManagerResources:
+
+>> kubectl get alertmanager -n monitoring
+>> kubectl get pods -n monitoring
+
+Check wheather the slack secret is mounted: 
+>> 
+kubectl get alertmanager prometheus-stack-kube-prom-alertmanager \
+  -n monitoring -o yaml
+
+
+Look under spec.secrets for: 
+
+secrets:
+  - slack-webhook
+
+Then we can verify the running Alertmanager configuration and trigger a test alert to confirm Slack Delivery
+
+
+Next Verify the secret mount in the running pod
+>> kubectl get pods -n monitoring | grep alertmanager
+>> kubectl describe pod -n monitoring <ALERTMANAGER_POD_NAME>
+
+
+Look under the mounts also check the pod events and status for monting errors
+
+If the Secret is not begin mounted check : 
+
+Check whether the Alertmanager Operator logs: 
+
+>> 
+kubectl logs -n monitoring \
+  deployment/prometheus-stack-kube-prom-operator \
+  --since=15m | grep -i -E 'alertmanager|secret|error'
+
+This may reveal why the secert isnt' being mounted
+
+The expected configuratoin should eventually produce a mount similart to: 
+
+volumes:
+  - name: secret-slack-webhook
+    secret:
+      secretName: slack-webhook
+
+And  inside the AlertManager container: 
+>> /etc/alertmanager/secrets/slack-webhook
+
+Then check the Statefulset:
+kubectl get statefulset \
+  alertmanager-prometheus-stack-kube-prom-alertmanager \
+  -n monitoring
+
+Then check the pod: 
+kubectl get statefulset \
+  alertmanager-prometheus-stack-kube-prom-alertmanager \
+  -n monitoring
+
+
+
+
+Next Render the updated Helm cnofiguration: 
+
+>> 
+
+helm template prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --version 92.16.0 \
+  -f prometheus-stack-values.yaml \
+  > /tmp/prometheus-rendered.yaml
+
+Run the Helm Dry run:
+helm upgrade prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --version 92.16.0 \
+  -f prometheus-stack-values.yaml \
+  --dry-run=server --debug
+
+Then apply it: 
+
+helm upgrade prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --version 92.16.0 \
+  -f prometheus-stack-values.yaml
+
+
+Then after this Open the Prometheus and check the Alert seciont to check 
+whether the alertmanager and the prometheus are connected 
+
+YOu will see something like this in the alert section
+>> http://10.244.1.248:9093/api/v2/alerts
+
+
+Then creata a temporary test-alert to check the connection between alert manager and the Slack
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: slack-test-alert
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+
+spec:
+  groups:
+    - name: slack-test
+      rules:
+        - alert: SlackNotificationTest
+          expr: vector(1)
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Slack notification test"
+            description: "Testing Prometheus to Alertmanager to Slack notification delivery."
+
+ 

@@ -1,0 +1,81 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+
+metadata:
+  name: ecommerce-pod-health-alerts
+  namespace: monitoring
+  labels:
+    # must match the release  lable expected by your 
+    # kube-prometheus-stack configuration
+    release: prometheus-stack
+   
+    app.kubernetes.io/part-of: ecommerce-platform
+
+spec:
+  # A prometheusRule can contain one or more rule groups
+
+  groups:
+    # Name of this group of related alerting rules
+    # Used to organize rules inside the prometheus
+    # One prometheusRule can have multiple group
+    # One group can have multiple alerting rules
+  
+    - name: ecommerce.pod.health
+      # Contains the individual alerting rules in this group
+      rules:
+
+
+        # Alert when an ecommerce pod is not fully Ready.
+        - alert: EcommercePodNotReady
+          expr: |
+            (
+               kube_pod_status_ready{
+                 namespace="ecommerce",
+                 condition="true"
+               } == 0
+            )
+            and on(namespace, pod)
+            (
+             kube_pod_owner{
+               namespace="ecommerce",
+               owner_kind=~"ReplicaSet|StatefulSet",
+               owner_is_controller="true"
+             }
+            )
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ecommerce pod is not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has not been Ready for more than 5 minutes."
+
+        # Alert when an ecommerce container enters CrashLoopBackOff.
+        - alert: EcommercePodCrashLooping
+          expr: |
+            kube_pod_container_status_waiting_reason{
+              namespace="ecommerce",
+              reason="CrashLoopBackOff"
+            } == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ecommerce container is crash looping"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} is in CrashLoopBackOff."
+
+        # Alert when an ecommerce pod is stuck in a non-terminal,
+        # non-Running phase.
+        - alert: EcommercePodStuck
+          expr: |
+            kube_pod_status_phase{
+              namespace="ecommerce",
+              phase=~"Pending|Unknown"
+            } == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ecommerce pod is stuck"
+            description: "Pod {{ $labels.pod }} has remained in phase {{ $labels.phase }} for more than 5 minutes."
+

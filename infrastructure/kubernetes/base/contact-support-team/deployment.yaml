@@ -41,7 +41,7 @@ spec:
 
       containers:
         - name: contact-support-team
-          image: contact-support-team:v1
+          image: contact-support-team:v2
           imagePullPolicy: IfNotPresent
 
           ports:

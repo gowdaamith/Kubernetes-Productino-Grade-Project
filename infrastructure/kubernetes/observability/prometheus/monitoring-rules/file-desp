@@ -1,0 +1,11 @@
+pod-health-alerts.yaml	Pod not ready, pod unavailable
+deployment-alerts.yaml	Unavailable replicas, rollout problems
+container-resource-alerts.yaml	High CPU, high memory, container restarts
+mongodb-alerts.yaml	MongoDB availability and health
+postgresql-alerts.yaml	PostgreSQL availability and connections
+mysql-alerts.yaml	MySQL availability and connections
+rabbitmq-alerts.yaml	Queue depth, unavailable RabbitMQ
+node-alerts.yaml	Node CPU, memory, disk pressure
+kubernetes-alerts.yaml	Kubernetes component health
+
+
