@@ -1,0 +1,133 @@
+1. SingleBinary Loki (Monolithic mode)
+
+In SingleBinary mode, all Loki components run together inside a single process, typically in one Kubernetes Pod.
+
+For example, Loki internally contains:
+- Distributor – receives incoming logs.
+- Ingester – processes and stores log data.
+- Querier – executes log queries.
+- Query Frontend – manages and optimizes queries.
+- Compactor – manages stored log data.
+- Ruler – evaluates alerting rules.
+
+In SingleBinary mode, all these components run together.
+
+Kubernetes Cluster
+       |
+       v
+  Loki Namespace
+       |
+       v
+  Loki Deployment
+       |
+       v
+  Loki Pod
+       |
+       +-- Distributor
+       +-- Ingester
+       +-- Querier
+       +-- Query Frontend
+       +-- Compactor
+       +-- Ruler
+       |
+       v
+  Persistent/Object Storage
+
+You generally deploy one Loki Pod for a small installation.
+
+Advantages:
+- Easy to install and configure.
+- Fewer Kubernetes resources.
+- Lower infrastructure overhead.
+- Easy to troubleshoot.
+- Suitable for development and small environments.
+
+Disadvantages:
+- All components share CPU and memory resources.
+- Cannot independently scale individual components.
+- A single Pod failure can interrupt the entire Loki service when running one replica.
+- Less suitable for large log volumes.
+
+
+2. Distributed Loki (Microservices mode)
+-----------------------------------------
+
+In Distributed mode, Loki components run as separate Kubernetes workloads.
+Instead of running everything inside one Pod, you deploy individual components.
+
+Kubernetes Cluster
+       |
+       v
+  Loki Namespace
+       |
+       +-- Distributor Pods
+       |
+       +-- Ingester Pods
+       |
+       +-- Querier Pods
+       |
+       +-- Query Frontend Pods
+       |
+       +-- Query Scheduler Pods
+       |
+       +-- Compactor Pods
+       |
+       +-- Index Gateway Pods
+       |
+       v
+  Shared Object Storage (S3)
+
+Each Component has its own responsiblity and can be scaled indepedently 
+depending on the requiremnts
+
+Advantages:
+- Independent horizontal scaling.
+- Better control over CPU and memory allocation.
+- Better suited for high log ingestion volumes.
+- Components can have independent availability configurations.
+- Suitable for large Kubernetes environments.
+Disadvantages:
+- More Kubernetes resources.
+- More complex configuration.
+- Requires shared object storage.
+- More complicated troubleshooting.
+- Higher operational overhead.
+
+
+
+
+Loki components and their responsibilities
+1. Distributor Pods – Receive logs
+- Receive logs from Grafana Alloy.
+- Decide where the logs should go.
+- Forward logs to Ingester Pods.
+Think: Receptionist who receives and directs incoming logs.
+2. Ingester Pods – Store logs
+- Receive logs from Distributors.
+- Organize logs into chunks.
+- Compress and store the logs.
+Think: Warehouse worker who organizes and stores incoming goods.
+3. Querier Pods – Search logs
+- Execute LogQL queries.
+- Retrieve matching logs from Ingester and storage.
+- Return results to Grafana.
+Think: Employee who searches for the information you request.
+4. Query Frontend Pods – Manage queries
+- Receive queries from Grafana.
+- Split large queries into smaller queries.
+- Improve query performance through caching and parallel processing.
+Think: Manager who divides a big task into smaller tasks.
+5. Query Scheduler Pods – Schedule queries
+- Manage and distribute queries among Querier Pods.
+- Help prevent individual Queriers from becoming overloaded.
+Think: Supervisor who distributes work among employees.
+6. Compactor Pods – Clean and optimize storage
+- Compact index files.
+- Remove expired log data according to retention settings.
+- Optimize stored index data.
+Think: Maintenance worker who organizes the warehouse and removes expired goods.
+7. Index Gateway Pods – Manage index access
+- Provide index information to Querier Pods.
+- Retrieve relevant index data from storage.
+- Reduce the need for every Querier to independently handle index files.
+Think: Librarian who helps employees find where information is stored.

@@ -1,0 +1,216 @@
+             Loki
+______________________________
+
+Grafana Loki is a open-source log aggregation system used to collect ,store and query logs from applications and infrastructures
+
+In simple Words: 
+
+Imagine your e-commerce application has multiple microservices:
+* Product catalogt
+* Product Inventory
+* Order Management
+* Shipping and Handling
+* Profile Management
+* Contact Support
+
+Each service generate logs when it runs
+
+For example: 
+
+Product catalog Logs: 
+INFO: Product service started
+INFO: Connected to MongoDB
+INFO: GET /api/products - 200 OK
+ERROR: Failed to retrieve product
+
+Order Management Logs: 
+INFO: Order service started
+INFO: New order received
+INFO: Order saved successfully
+ERROR: MongoDB connection timeout
+
+The problem is that every application generate the logs separately 
+If you want to troubleshoot and error , you would otherwise need to access 
+individual kubernetes Pods and inspect their logs
+---------------------------------------------------------------------------
+This becomes difficult  when you have many microservices and multiple replicas
+
+
+
+Loki solves this problem by collecting logs from different sources and making them searchable from one centralized location.
+
+___________________________________________________________________________
+
+2.Why do we need Loki
+----------------------
+
+Consider this situation in the project:
+A customer Places an order , but the order fails
+
+The request might travel through multiple services:
+
+Customer
+   |
+   v
+E-commerce UI
+   |
+   v
+Order Management
+   |
+   v
+RabbitMQ
+   |
+   v
+Order Worker
+   |
+   v
+MongoDB
+
+Suppose the order worker fails because of a database connection timeout.
+
+You need to investigate:
+1. Did Order Management receive the request?
+2. Was the message published to RabbitMQ?
+3. Did Order Worker consume the message?
+4. Why did the database operation fail?
+
+
+Each service has its own logs.
+Loki helps you collect and search logs from all these services in a centralized system.
+
+
+For example, you can search for: 
+>> {namespace="ecommerce"}
+
+This retrieves logs from the commerce namespace
+
+
+or
+
+{app="order-worker"} |= "ERROR"
+
+This filters logs from the order-worker application containing the word ERROR.
+This query language is called as LogQL
+
+3.How does the Loki work
+--------------------------
+
+A typical Loki logging architecture has three main parts:
+
+1.Grafana Alloy : Log collector
+>> Collects log from kubernetes Pods and Sends them to Loki
+
+2.Loki  : Log storage and Proccessing
+>> Receives , organizes , stores and retrives the logs
+
+3.Grafana : Log visualization
+>> Allow you to search , filter , explore and visualize logs
+
+
+
+Step 1: Application Generate Logs: 
+------------------------------------
+
+Your Kubernetes application continuously generate logs:
+
+Kubernetes makes container logs available through its container runtime, generally accessible using:
+
+>> kubectl logs <pod-name> -n ecommerce
+
+We use the Grafana Alloy to collect these logs and send it to the Loki
+Alloy is a telementory collector that runs in kubernetes , commonly as a 
+DaemonSet
+
+[A DaemonSet ensures that a Pod runs on each eligible Kubernetes node.]
+
+
+Alloy reads the container log files form kubernetes node: 
+It also attaches usefull metadata such as: 
+* Namespace
+* Application name
+* Pod name
+* Container name
+
+Then it forwards the logs to Loki using HTTP push request
+
+Step 2: Loki receives logs
+-----------------------------
+
+Now the logs reach Loki
+Inside loki , the write path involves two important components
+
+A. Distributor
+--------------------------------------------------------------
+Receives incoming log requests from Alloy.
+Identifies the log streams using their labels.
+Routes the log streams to the appropriate ingesters.
+
+B. Ingester
+
+Receives logs from the distributor.
+Groups logs into chunks.
+Compresses the log data.
+Stores data according to the configured storage backend.
+
+
+Think of this way :
+
+* Distirbutor = Receptionist who Receives and routes the log
+* Ingester    = Worker who organizes and stores logs
+
+These are logical componenets
+
+
+
+____________________________________________________________________________
+
+How does the loki stores the Logs?
+This is one of the most important concepts in Loki
+Unlike ElasticSearch , Loki doesn't build the full-text index of  every log
+line 
+
+Instead , it primarily uses two  things?
+1.Index
+2.Chunks
+
+A.Index
+  The Index stores information about log streams and helps Loki locate the relevant log data
+
+namespace = ecommerce
+app       = product-catalog
+container = product-catalog
+
+B.Chunks
+  Chunks contains the actual log entries
+
+10:00:01 INFO Application started
+10:00:05 INFO MongoDB connected
+10:00:10 ERROR Product not found
+
+Loki compresses these log entries and stores them in chunks 
+
+Think of a library:
+- Index = Library catalogue that tells you where a book is.
+- Chunks = Actual books containing the information.
+
+When you search, Loki first uses the index to identify relevant streams and then searches the corresponding log data.
+
+
+
+Step 5: Grafana Queries Logs from Loki
+----------------------------------------
+Now suppose you want to investigate an error in your Product catalog service
+
+You open Grafana and Navigate to : 
+
+Grafana → Explore → Loki
+
+You write a LogQL query: 
+>> {namespace="ecommerce"}
+
+This retrieves logs belonging to the ecommerce namespace
+To find only error messages:
+
+{namespace="ecommerce"} |= "ERROR"
+
+

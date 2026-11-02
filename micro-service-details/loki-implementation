@@ -1,0 +1,98 @@
+Step 1: Add the Loki configuration: 
+----------------------------------
+
+We'll use the official Grafana Loki Helm chart with Single Binary deploymentmode
+
+First ,add the Grafana Helm repository:
+
+>> helm repo add grafana https://grafana.github.io/helm-charts
+
+Update the repository: 
+>> helm repo update
+
+Check wheather the loki chart is available or not:
+>> helm search repo grafana/loki
+
+create loki-values.yaml
+
+Install Loki using the Helm
+----------------------------
+>> 
+
+helm upgrade --install loki grafana/loki \
+  --namespace monitoring \
+  --values loki-values.yaml \
+  --wait \
+  --timeout 10m
+
+
+After Installation Check : 
+
+>> kubectl get pods -n monitoring
+Expected Result: loki-0   2/2   Running   0 restarts
+
+And:
+
+>> kubectl get pvc -n monitoring
+Expected Result: storage-loki-0   Bound   10Gi   RWO   standard
+
+
+___________________________________________________________________________
+
+Install the Grafana/alloy
+
+Step 1: Inspect the available chart
+-----------------------------------
+>> helm search repo grafana/alloy
+
+Create a alloy-values.yaml
+
+Step 2: Validate the Helm configuaration
+
+>> 
+helm template alloy grafana/alloy \
+  --namespace monitoring \
+  --values alloy-values.yaml \
+  > /tmp/alloy-rendered.yaml
+
+Then check : 
+
+>> kubectl get pod -n monitoring
+>> kubectl get daemonset alloy -n monitoring
+
+To Check every mounting is correctly working use : 
+
+>> 
+kubectl logs -n monitoring daemonset/alloy \
+  -c alloy  \
+  --tail=60
+
+Or
+
+>>
+
+kubectl logs -n monitoring daemonset/alloy \
+  -c alloy \
+  --since=5m | grep -Ei 'error|warn|failed|loki|push' | tail -40
+
+
+If any error occurs correct them and upgrade them: 
+
+helm upgrade --install alloy grafana/alloy \
+  --namespace monitoring \
+  --values alloy-values.yaml \
+  --wait \
+  --timeout 10m
+
+___________________________________________________________________________
+
+Next AFter the connection Add the Loki as the grafana datasource
+
+Step 1: Open Grafana: 
+If Grafana is not already accessible , run :
+
+kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
+
+ and create a dashboard making the Loki as the data source
+
+    
