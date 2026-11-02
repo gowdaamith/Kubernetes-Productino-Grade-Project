@@ -1,4 +1,4 @@
-module main
+module github.com/gowdaamith/shipping-and-handling
 
 go 1.23
 

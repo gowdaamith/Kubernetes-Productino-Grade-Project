@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Typography, Button, Grid, Paper } from '@material-ui/core';
+import { Container, Typography, Button, Paper } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 import {  toast } from 'react-toastify';
@@ -68,55 +68,54 @@ const Orders = () => {
   const [orderPlaced, setOrderPlaced] = useState(false);
 
   useEffect(() => {
+    const calculateTotals = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+
+        const subtotalResponse = await fetch(`/api/orders/${user.id}/cart/subtotal`);
+        if (!subtotalResponse.ok) {
+          const errorData = await subtotalResponse.json();
+          throw new Error(errorData.error);
+        }
+
+        const subtotal = await subtotalResponse.json();
+        setSubtotal(subtotal);
+
+        const shippingResponse = await fetch(`/api/orders/${user.id}/cart/shipping`);
+        const shippingTotal = await shippingResponse.json();
+        setShippingTotal(shippingTotal);
+      } catch (error) {
+        console.error('Error calculating totals:', error);
+        toast.error('Error accessing API', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    };
+
+    const fetchCartItems = async () => {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const response = await fetch(`/api/orders/${user.id}/cart`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error);
+        }
+        const data = await response.json();
+        setCartItems(data);
+        calculateTotals();
+      } catch (error) {
+        console.error('Error fetching cart items:', error);
+        toast.error('Error accessing API', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    };
+
     fetchCartItems();
   }, []);
 
-  const fetchCartItems = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await fetch(`/api/orders/${user.id}/cart`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error);
-      }
-      const data = await response.json();
-      setCartItems(data);
-      calculateTotals();
-    } catch (error) {
-      console.error('Error fetching cart items:', error);
-      toast.error('Error accessing API', {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    }
-  };
-
-  const calculateTotals = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      
-      const subtotalResponse = await fetch(`/api/orders/${user.id}/cart/subtotal`);
-      if (!subtotalResponse.ok) {
-        const errorData = await subtotalResponse.json();
-        throw new Error(errorData.error);
-      }
-
-      const subtotal = await subtotalResponse.json();
-      setSubtotal(subtotal);
-  
-      const shippingResponse = await fetch(`/api/orders/${user.id}/cart/shipping`);
-      const shippingTotal = await shippingResponse.json();
-      setShippingTotal(shippingTotal);
-      
-    } catch (error) {
-      console.error('Error calculating totals:', error);
-      toast.error('Error accessing API', {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    }
-  };
-    
   const placeOrder = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));

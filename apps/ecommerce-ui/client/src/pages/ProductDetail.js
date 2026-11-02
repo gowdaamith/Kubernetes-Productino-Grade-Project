@@ -61,46 +61,46 @@ const ProductDetail = () => {
   const [quantity, setQuantity] = useState(null);
 
   useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const response = await fetch(`/api/products/${id}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error);
+        }
+        const data = await response.json();
+        setProduct(data);
+      } catch (error) {
+        console.error('Error fetching product:', error);
+        toast.error('Error accessing API', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    };
+
+    const fetchInventory = async () => {
+      try {
+        const response = await fetch(`/api/inventory/${id}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error);
+        }
+        const data = await response.json();
+        setQuantity(data.quantity);
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+        setQuantity(0);
+        toast.error('Error accessing Inventory API', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    };
+
     fetchProduct();
     fetchInventory();
   }, [id]);
-
-  const fetchProduct = async () => {
-    try {
-      const response = await fetch(`/api/products/${id}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error);
-      }
-      const data = await response.json();
-      setProduct(data);
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      toast.error('Error accessing API', {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    }
-  };
-
-  const fetchInventory = async () => {
-    try {
-      const response = await fetch(`/api/inventory/${id}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error);
-      }
-      const data = await response.json();
-      setQuantity(data.quantity);
-    } catch (error) {
-      console.error('Error fetching inventory:', error);
-      setQuantity(0);
-      toast.error('Error accessing Inventory API', {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    }
-  };
 
   const addToCart = async () => {
     try {
